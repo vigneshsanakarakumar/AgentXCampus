@@ -18,7 +18,7 @@ export const LiveNotificationListener = () => {
     let isSubscribed = true;
 
     try {
-      const streamUrl = `/api/v1/notifications/stream?token=${encodeURIComponent(token)}`;
+      const streamUrl = `http://localhost:8080/api/v1/notifications/stream?token=${encodeURIComponent(token)}`;
       eventSource = new EventSource(streamUrl);
 
       eventSource.addEventListener('connected', () => {

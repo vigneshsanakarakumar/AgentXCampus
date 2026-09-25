@@ -152,9 +152,30 @@ export const HodPortal = () => {
   const resolvedLeaves = leaveRequests.filter(l => l.status !== 'PENDING');
 
   // Filtered timetable data
-  const currentClassEntries = classTimetables[selectedSection] || [];
-  const currentFacultyEntry = facultyTimetables.find(f => String(f.facultyId) === String(selectedFacultyId));
-  const currentFacultySchedule = currentFacultyEntry ? currentFacultyEntry.schedule : [];
+  const currentClassEntries = (classTimetables && classTimetables[selectedSection]) || [];
+
+  const selectedFacultyObj = facultyRoster.find(f => String(f.id) === String(selectedFacultyId)) || facultyRoster[0];
+  const selectedFacultyName = selectedFacultyObj ? selectedFacultyObj.name : '';
+
+  const currentFacultySchedule = (() => {
+    if (!facultyTimetables) return [];
+    if (typeof facultyTimetables === 'object' && !Array.isArray(facultyTimetables)) {
+      if (selectedFacultyName && facultyTimetables[selectedFacultyName]) {
+        return facultyTimetables[selectedFacultyName];
+      }
+      const key = Object.keys(facultyTimetables).find(k =>
+        k.toLowerCase().includes((selectedFacultyName || '').toLowerCase()) ||
+        (selectedFacultyName || '').toLowerCase().includes(k.toLowerCase())
+      );
+      if (key && facultyTimetables[key]) return facultyTimetables[key];
+      return [];
+    }
+    if (Array.isArray(facultyTimetables)) {
+      const match = facultyTimetables.find(f => String(f.facultyId) === String(selectedFacultyId) || f.facultyName === selectedFacultyName);
+      return match ? (match.schedule || match) : [];
+    }
+    return [];
+  })();
 
   const daysOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
@@ -463,7 +484,7 @@ export const HodPortal = () => {
                   <h3 className="font-bold text-base text-[var(--color-foreground)]">
                     {timetableMode === 'class'
                       ? `Master Weekly Schedule — CSE Section ${selectedSection}`
-                      : `Individual Schedule — ${facultyRoster.find(f => String(f.id) === String(selectedFacultyId))?.name || 'Faculty Member'}`}
+                      : `Individual Schedule — ${selectedFacultyName || 'Faculty Member'}`}
                   </h3>
                 </div>
                 <Badge variant="info" size="sm">
