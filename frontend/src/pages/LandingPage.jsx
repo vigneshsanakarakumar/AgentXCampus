@@ -24,6 +24,7 @@ import { useAuth } from '../context/AuthContext';
 export const LandingPage = () => {
   const { isAuthenticated, role, user } = useAuth();
   const getPortalUrl = () => {
+    if (role === 'HOD') return '/hod/dashboard';
     if (role === 'FACULTY') return '/faculty/dashboard';
     if (role === 'STAFF') return '/staff/dashboard';
     if (role === 'ADMIN') return '/admin/dashboard';
@@ -51,25 +52,22 @@ export const LandingPage = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            {isAuthenticated ? (
-              <Link to={getPortalUrl()}>
-                <Button variant="primary" size="sm" icon={ArrowRight}>
-                  Open {role ? role.charAt(0) + role.slice(1).toLowerCase() : ''} Portal
+            <Link to="/login">
+              <Button variant="ghost" size="sm">
+                Login
+              </Button>
+            </Link>
+            <Link to="/signup">
+              <Button variant="primary" size="sm">
+                Sign Up
+              </Button>
+            </Link>
+            {isAuthenticated && (
+              <Link to={getPortalUrl()} className="hidden sm:inline-flex">
+                <Button variant="outline" size="sm" icon={ArrowRight}>
+                  Dashboard
                 </Button>
               </Link>
-            ) : (
-              <>
-                <Link to="/login">
-                  <Button variant="ghost" size="sm">
-                    Login
-                  </Button>
-                </Link>
-                <Link to="/signup">
-                  <Button variant="primary" size="sm">
-                    Sign Up
-                  </Button>
-                </Link>
-              </>
             )}
           </div>
         </div>
@@ -92,19 +90,11 @@ export const LandingPage = () => {
         </p>
 
         <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-          {isAuthenticated ? (
-            <Link to={getPortalUrl()} className="w-full sm:w-auto">
-              <Button size="lg" className="w-full sm:w-auto px-8" icon={ArrowRight}>
-                Enter {role ? role.charAt(0) + role.slice(1).toLowerCase() : ''} Dashboard
-              </Button>
-            </Link>
-          ) : (
-            <Link to="/login" className="w-full sm:w-auto">
-              <Button size="lg" className="w-full sm:w-auto px-8" icon={ArrowRight}>
-                Get Started
-              </Button>
-            </Link>
-          )}
+          <Link to={isAuthenticated ? getPortalUrl() : "/signup"} className="w-full sm:w-auto">
+            <Button size="lg" className="w-full sm:w-auto px-8" icon={ArrowRight}>
+              Get Started
+            </Button>
+          </Link>
           <a href="#features" className="w-full sm:w-auto">
             <Button variant="outline" size="lg" className="w-full sm:w-auto">
               Explore Platform
