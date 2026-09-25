@@ -4,6 +4,7 @@
 
 :root {
   /* Light Mode Semantic Tokens (Default) */
+  color-scheme: light;
   --color-primary: hsl(360, 49%, 50%);
   --color-background: hsl(360, 12%, 97%);
   --color-card: hsl(360, 12%, 97%);
@@ -15,6 +16,7 @@
 html.dark,
 .dark {
   /* Dark Mode Semantic Tokens */
+  color-scheme: dark;
   --color-primary: hsl(360, 49%, 55%);
   --color-background: hsl(360, 15%, 12%);
   --color-card: hsl(360, 15%, 12%);
@@ -26,6 +28,7 @@ html.dark,
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
     /* Fallback for system dark mode when no explicit class is set */
+    color-scheme: dark;
     --color-primary: hsl(360, 49%, 55%);
     --color-background: hsl(360, 15%, 12%);
     --color-card: hsl(360, 15%, 12%);
@@ -42,4 +45,70 @@ body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
+}
+
+/* ==========================================================================
+   Date / Time Input & Calendar Picker Styling
+   ========================================================================== */
+
+/* Enforce native color-scheme per theme on all date/time form controls */
+input[type="date"],
+input[type="datetime-local"],
+input[type="time"],
+input[type="month"],
+input[type="week"] {
+  color-scheme: light;
+}
+
+html.dark input[type="date"],
+html.dark input[type="datetime-local"],
+html.dark input[type="time"],
+html.dark input[type="month"],
+html.dark input[type="week"],
+.dark input[type="date"],
+.dark input[type="datetime-local"],
+.dark input[type="time"],
+.dark input[type="month"],
+.dark input[type="week"] {
+  color-scheme: dark;
+}
+
+/* WebKit / Chromium Calendar Picker Indicator Styling */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator,
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="week"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 3px;
+  opacity: 0.85;
+  transition: opacity 0.15s ease-in-out, background-color 0.15s ease-in-out, transform 0.15s ease-in-out;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator:hover,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator:hover,
+input[type="time"]::-webkit-calendar-picker-indicator:hover,
+input[type="month"]::-webkit-calendar-picker-indicator:hover,
+input[type="week"]::-webkit-calendar-picker-indicator:hover {
+  opacity: 1;
+  background-color: var(--color-border);
+  transform: scale(1.05);
+}
+
+/* Ensure crisp contrast in dark mode against espresso backgrounds */
+html.dark input[type="date"]::-webkit-calendar-picker-indicator,
+html.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+html.dark input[type="time"]::-webkit-calendar-picker-indicator,
+.dark input[type="date"]::-webkit-calendar-picker-indicator,
+.dark input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+.dark input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: brightness(1.2);
+}
+
+/* Ensure high contrast in light mode against greige backgrounds */
+html:not(.dark) input[type="date"]::-webkit-calendar-picker-indicator,
+html:not(.dark) input[type="datetime-local"]::-webkit-calendar-picker-indicator,
+html:not(.dark) input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: contrast(1.2);
 }
