@@ -62,13 +62,6 @@ export const LandingPage = () => {
                 Sign Up
               </Button>
             </Link>
-            {isAuthenticated && (
-              <Link to={getPortalUrl()} className="hidden sm:inline-flex">
-                <Button variant="outline" size="sm" icon={ArrowRight}>
-                  Dashboard
-                </Button>
-              </Link>
-            )}
           </div>
         </div>
       </nav>
