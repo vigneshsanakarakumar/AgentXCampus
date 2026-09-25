@@ -4,6 +4,7 @@ import com.agentx.campus.dto.AgentChatResponse;
 import com.agentx.campus.model.Assignment;
 import com.agentx.campus.model.AttendanceRecord;
 import com.agentx.campus.model.Course;
+import com.agentx.campus.model.User;
 import com.agentx.campus.service.CampusToolRegistry;
 import com.agentx.campus.service.GroqAiService;
 import org.springframework.stereotype.Service;
@@ -80,14 +81,37 @@ public class AcademicAgent {
             return new AgentChatResponse(explainAnswer, "Academic Agent", steps, entryData, latency);
         }
 
-        steps.add("Academic Agent: Fetching student profile & academic enrollment...");
+        // Check if query is targeting a specific named student or roll number
+        User targetStudent = toolRegistry.findStudentInQuery(query);
+        String targetUsername = username;
+        boolean isQueryingOtherStudent = false;
 
-        Map<String, Object> profile = toolRegistry.getStudentProfile(username);
+        if (targetStudent != null) {
+            boolean authorized = toolRegistry.isAuthorizedToViewStudent(username, targetStudent);
+            if (!authorized) {
+                steps.add("Access Control: User '" + username + "' requested records for student '" 
+                        + targetStudent.getFirstName() + " " + targetStudent.getLastName() + "' (" + targetStudent.getUsername() + ")");
+                steps.add("Access Control: REJECTED — Institutional privacy policy forbids unauthorized student record access.");
+                String rejectionMsg = "🔒 **Access Restricted**: You are not authorized to view the academic or attendance records of **"
+                        + targetStudent.getFirstName() + " " + targetStudent.getLastName() + "**.\n\n"
+                        + "Institutional privacy regulations permit students to view only their own academic records. Faculty mentors and department administrators may view records only for their assigned students.";
+                long latency = System.currentTimeMillis() - startTime;
+                return new AgentChatResponse(rejectionMsg, "Academic Agent", steps, Map.of("authorized", false, "privacyViolation", true), latency);
+            }
+            targetUsername = targetStudent.getUsername();
+            isQueryingOtherStudent = !targetStudent.getUsername().equalsIgnoreCase(username);
+            steps.add("Access Control: Authorized access verified for student '" 
+                    + targetStudent.getFirstName() + " " + targetStudent.getLastName() + "' (" + targetUsername + ")");
+        }
+
+        steps.add("Academic Agent: Fetching student profile & academic enrollment for [" + targetUsername + "]...");
+
+        Map<String, Object> profile = toolRegistry.getStudentProfile(targetUsername);
         String dept = (String) profile.getOrDefault("department", "Computer Science & Engineering");
         String sec = (String) profile.getOrDefault("section", "C");
 
-        steps.add("Tool Call: getAttendance('" + username + "')");
-        List<AttendanceRecord> attendanceList = toolRegistry.getAttendance(username);
+        steps.add("Tool Call: getAttendance('" + targetUsername + "')");
+        List<AttendanceRecord> attendanceList = toolRegistry.getAttendance(targetUsername);
 
         steps.add("Tool Call: getAssignments('" + dept + "', '" + sec + "')");
         List<Assignment> assignments = toolRegistry.getAssignments(dept, sec);
@@ -95,9 +119,11 @@ public class AcademicAgent {
         steps.add("Tool Call: getCourses('" + dept + "')");
         List<Course> courses = toolRegistry.getCourses(dept);
 
+        String studentDisplayName = (String) profile.getOrDefault("name", targetUsername);
+
         StringBuilder context = new StringBuilder();
         context.append("STUDENT ACADEMIC PROFILE:\n");
-        context.append("- Name: ").append(profile.getOrDefault("name", username)).append("\n");
+        context.append("- Name: ").append(studentDisplayName).append("\n");
         context.append("- Roll No: ").append(profile.getOrDefault("rollNumber", "N/A")).append("\n");
         context.append("- Department: ").append(dept).append(", Section: ").append(sec).append("\n");
         context.append("- Semester: ").append(profile.getOrDefault("semester", 5)).append(", CGPA: ").append(profile.getOrDefault("cgpa", 8.5)).append("\n\n");
@@ -130,11 +156,22 @@ public class AcademicAgent {
                     c.getCourseCode(), c.getCourseName(), c.getCredits(), c.getFacultyName()));
         }
 
-        String prompt = "You are the specialized Academic Agent for AgentX Campus.\n"
-                + "Answer the student's question accurately using ONLY the verified database data below.\n"
-                + "Format key items with bullet points and bold text.\n"
-                + "If asked about attendance, state specific subject percentages and overall standing (75% minimum required).\n"
-                + "If asked about assignments, state title, course, deadline, and priority.\n\n"
+        Course targetCourse = toolRegistry.findCourseInQuery(query);
+        if (targetCourse != null) {
+            steps.add("Resolved target course from query: " + targetCourse.getCourseName() + " (" + targetCourse.getCourseCode() + ")");
+        }
+
+        String prompt = "You are the specialized Academic Registry Agent for AgentX Campus.\n"
+                + "Answer the query authoritatively and accurately using ONLY the verified database data below.\n"
+                + (isQueryingOtherStudent ? "NOTE: An authorized faculty mentor or administrator is inquiring about student: " + studentDisplayName + ".\n" : "")
+                + (targetCourse != null ? "NOTE: The user is specifically inquiring about: " + targetCourse.getCourseName() + " (" + targetCourse.getCourseCode() + "). Highlight this course specifically.\n" : "")
+                + "INSTRUCTIONS:\n"
+                + "1. State the student's full name (" + studentDisplayName + "), Roll Number, Department, and Section clearly.\n"
+                + "2. If asked about attendance, present a clean breakdown of each course: Course Code, Course Name, Classes Attended, Total Classes, and exact Percentage (e.g. 39/40 - 97.5%).\n"
+                + "3. State the overall attendance rate and compare against the 75% institutional mandatory requirement.\n"
+                + "4. If any course is below 75%, highlight it as an attendance deficit warning.\n"
+                + "5. If asked about assignments or grades, provide detailed deadlines, priority, and submission status.\n"
+                + "6. Format using clean markdown bolding, lists, and clear professional tone.\n\n"
                 + context.toString();
 
         steps.add("Reasoning with Groq AI using verified academic ground truth...");
@@ -143,24 +180,69 @@ public class AcademicAgent {
         if (answer == null || answer.trim().isEmpty()) {
             // Intelligent fallback from database context
             String lower = query.toLowerCase();
-            if (lower.contains("attendance")) {
-                StringBuilder sb = new StringBuilder("Here is your verified subject-wise attendance breakdown:\n\n");
-                for (AttendanceRecord a : attendanceList) {
-                    sb.append(String.format("• **%s** (%s): **%.1f%%** (%d/%d classes)\n",
-                            a.getCourseName(), a.getCourseCode(), a.getPercentage(), a.getAttendedClasses(), a.getTotalClasses()));
+            boolean isAttendance = toolRegistry.isAttendanceIntent(lower);
+            if (isAttendance) {
+                StringBuilder sb = new StringBuilder();
+                if (targetCourse != null) {
+                    AttendanceRecord rec = attendanceList.stream()
+                            .filter(a -> a.getCourseCode().equalsIgnoreCase(targetCourse.getCourseCode()))
+                            .findFirst().orElse(null);
+                    if (rec != null) {
+                        if (isQueryingOtherStudent) {
+                            sb.append("Here is the verified academic attendance for **").append(studentDisplayName)
+                              .append("** (Roll No: `").append(profile.getOrDefault("rollNumber", "N/A"))
+                              .append("`) in **").append(rec.getCourseName()).append("** (`").append(rec.getCourseCode()).append("`):\n\n");
+                        } else {
+                            sb.append("Here is your verified academic attendance for **").append(rec.getCourseName())
+                              .append("** (`").append(rec.getCourseCode()).append("`):\n\n");
+                        }
+                        sb.append("• **Classes Attended**: ").append(rec.getAttendedClasses())
+                          .append(" / ").append(rec.getTotalClasses()).append(" classes\n");
+                        sb.append("• **Attendance Percentage**: **").append(String.format("%.1f%%", rec.getPercentage())).append("**\n");
+
+                        int minRequired = (int) Math.ceil(rec.getTotalClasses() * 0.75);
+                        if (rec.getPercentage() >= 75.0) {
+                            int margin = rec.getAttendedClasses() - minRequired;
+                            sb.append("• **Institutional Status**: **ELIGIBLE** (Above mandatory 75% cutoff)\n");
+                            sb.append("• **Attendance Buffer**: You are ").append(margin)
+                              .append(" class(es) above the minimum required (").append(minRequired).append(" classes required).\n");
+                        } else {
+                            int deficit = minRequired - rec.getAttendedClasses();
+                            sb.append("• **Institutional Status**: ⚠️ **ATTENDANCE DEFICIT** (Below mandatory 75% cutoff)\n");
+                            sb.append("• **Action Required**: You must attend the next ").append(deficit)
+                              .append(" class(es) consecutively to attain examination clearance.\n");
+                        }
+                        answer = sb.toString();
+                    } else {
+                        answer = "You are currently not enrolled in attendance sessions for **" + targetCourse.getCourseName() + "** (" + targetCourse.getCourseCode() + ").";
+                    }
+                } else {
+                    if (isQueryingOtherStudent) {
+                        sb.append("Here is the verified academic attendance breakdown for **").append(studentDisplayName)
+                          .append("** (Roll No: `").append(profile.getOrDefault("rollNumber", "N/A"))
+                          .append("`, ").append(dept).append(" Sec ").append(sec).append("):\n\n");
+                    } else {
+                        sb.append("Here is your verified subject-wise attendance breakdown:\n\n");
+                    }
+                    for (AttendanceRecord a : attendanceList) {
+                        sb.append(String.format("• **%s** (%s): **%.1f%%** (%d/%d classes)\n",
+                                a.getCourseName(), a.getCourseCode(), a.getPercentage(), a.getAttendedClasses(), a.getTotalClasses()));
+                    }
+                    sb.append(String.format("\nOverall Attendance Standing: **%s%%** (Institutional Requirement: 75%%)", profile.getOrDefault("attendanceRate", 85)));
+                    answer = sb.toString();
                 }
-                sb.append(String.format("\nOverall Attendance Standing: **%s%%** (Requirement: 75%%)", profile.getOrDefault("attendanceRate", 85)));
-                answer = sb.toString();
             } else if (lower.contains("assignment")) {
-                StringBuilder sb = new StringBuilder("Here are your upcoming academic assignments:\n\n");
+                StringBuilder sb = new StringBuilder("Here are upcoming academic assignments for ")
+                        .append(dept).append(" Sec ").append(sec).append(":\n\n");
                 for (Assignment asg : assignments) {
                     sb.append(String.format("• **%s** (%s) — Due: **%s** | Priority: **%s**\n",
                             asg.getTitle(), asg.getSubjectCode(), asg.getDueDate(), asg.getPriority()));
                 }
                 answer = sb.toString();
             } else {
-                StringBuilder sb = new StringBuilder("Here are your enrolled courses for Semester ")
-                        .append(profile.getOrDefault("semester", 5)).append(":\n\n");
+                StringBuilder sb = new StringBuilder("Here are the enrolled courses for ")
+                        .append(studentDisplayName).append(" (Semester ")
+                        .append(profile.getOrDefault("semester", 5)).append("):\n\n");
                 for (Course c : courses) {
                     sb.append(String.format("• **%s**: %s (%d Credits, Faculty: %s)\n",
                             c.getCourseCode(), c.getCourseName(), c.getCredits(), c.getFacultyName()));
@@ -171,7 +253,7 @@ public class AcademicAgent {
 
         steps.add("✓ Verified against Institutional Academic Registry");
         long latency = System.currentTimeMillis() - startTime;
-        return new AgentChatResponse(answer, "Academic Agent", steps, Map.of("academicVerified", true, "toolsCalled", "getAttendance, getAssignments, getCourses"), latency);
+        return new AgentChatResponse(answer, "Academic Agent", steps, Map.of("academicVerified", true, "student", studentDisplayName, "toolsCalled", "getAttendance, getAssignments, getCourses"), latency);
     }
 
     private String extractDateHint(String q) {

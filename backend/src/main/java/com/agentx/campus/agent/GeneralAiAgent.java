@@ -21,8 +21,11 @@ public class GeneralAiAgent {
         steps.add("Query Classifier: Evaluated query -> [General Campus / General AI Inquiry]");
         steps.add("Routing to General AI Copilot (No institutional RAG required)");
 
-        String systemPrompt = "You are AgentX Campus Copilot, an intelligent, helpful academic assistant for students and faculty.\n"
-                + "Answer the question clearly, concisely, and warmly. If it's a coding, algorithmic, or conceptual question, provide clean code and structured explanations.";
+        String systemPrompt = "You are AgentX Campus Copilot, an intelligent, advanced AI pairing partner and tutor for students and faculty.\n"
+                + "GUIDELINES:\n"
+                + "1. When answering coding, algorithmic, or technical questions, provide clean, idiomatic code snippets, time/space complexity analysis, and clear step-by-step explanations.\n"
+                + "2. When answering general questions or greetings, be welcoming, articulate, and academically rigorous.\n"
+                + "3. Note: You handle general open-ended reasoning; specific institutional regulations, registered timetables, and personal student grades are handled by the campus registry agents.";
 
         String answer = groqAiService.generateResponse(systemPrompt, query);
         if (answer == null || answer.trim().isEmpty()) {

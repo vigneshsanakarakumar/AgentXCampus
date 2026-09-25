@@ -74,21 +74,36 @@ public class TaskPlanningAgent {
 
         steps.add("✓ 2 actionable student tasks generated and persisted to database");
 
+        String planningPrompt = "You are the specialized Task Planning & Academic Execution Agent for AgentX Campus.\n"
+                + "Create an intelligent, structured, multi-phase academic preparation roadmap for the student for the subject: " + detectedSubject + ".\n"
+                + "INSTRUCTIONS:\n"
+                + "1. Break the roadmap into clear phases: Phase 1 (Conceptual Mastery & Notes), Phase 2 (Problem Solving & Practical Application), Phase 3 (Mock Assessments & High-Yield Revision).\n"
+                + "2. Mention specific core topics and syllabus methodologies relevant to " + detectedSubject + ".\n"
+                + "3. Provide concrete daily time blocks and clear milestones.\n"
+                + "4. Use clean markdown formatting with bold headings and bullet points.";
+
+        steps.add("Synthesizing personalized study strategy with Groq AI...");
+        String aiPlan = groqAiService.generateResponse(planningPrompt, query);
+
         StringBuilder responseBuilder = new StringBuilder();
-        responseBuilder.append("### 🎯 Multi-Step Preparation & Action Plan for **").append(detectedSubject).append("**\n\n");
-        responseBuilder.append("Based on your academic schedule, upcoming deadlines, and active course syllabus, here is your customized execution plan:\n\n");
+        if (aiPlan != null && !aiPlan.trim().isEmpty()) {
+            responseBuilder.append(aiPlan.trim()).append("\n\n");
+        } else {
+            responseBuilder.append("### 🎯 Multi-Step Preparation & Action Plan for **").append(detectedSubject).append("**\n\n");
+            responseBuilder.append("Based on your academic schedule, upcoming deadlines, and active course syllabus, here is your customized execution plan:\n\n");
 
-        responseBuilder.append("#### Phase 1: Conceptual Foundation & Notes (Days 1–2)\n");
-        responseBuilder.append("• Review syllabus modules and lecture slides.\n");
-        responseBuilder.append("• Consolidate handwritten notes and clarify doubts with your course instructor.\n\n");
+            responseBuilder.append("#### Phase 1: Conceptual Foundation & Notes (Days 1–2)\n");
+            responseBuilder.append("• Review syllabus modules and lecture slides.\n");
+            responseBuilder.append("• Consolidate handwritten notes and clarify doubts with your course instructor.\n\n");
 
-        responseBuilder.append("#### Phase 2: Problem Solving & Lab Application (Days 3–4)\n");
-        responseBuilder.append("• Solve previous internal assessment papers and benchmark problems.\n");
-        responseBuilder.append("• Check assignment submissions to ensure all practical components are understood.\n\n");
+            responseBuilder.append("#### Phase 2: Problem Solving & Lab Application (Days 3–4)\n");
+            responseBuilder.append("• Solve previous internal assessment papers and benchmark problems.\n");
+            responseBuilder.append("• Check assignment submissions to ensure all practical components are understood.\n\n");
 
-        responseBuilder.append("#### Phase 3: Mock Revision & Peer Study (Day 5)\n");
-        responseBuilder.append("• Complete a timed 60-minute mock revision test.\n");
-        responseBuilder.append("• Consult with your Faculty Mentor during designated advising hours.\n\n");
+            responseBuilder.append("#### Phase 3: Mock Revision & Peer Study (Day 5)\n");
+            responseBuilder.append("• Complete a timed 60-minute mock revision test.\n");
+            responseBuilder.append("• Consult with your Faculty Mentor during designated advising hours.\n\n");
+        }
 
         responseBuilder.append("📋 **Automated Action Items Added to Your Student Dashboard:**\n");
         responseBuilder.append(String.format("1. [Task #%d] **%s** — Priority: `%s` | Due: %s\n",

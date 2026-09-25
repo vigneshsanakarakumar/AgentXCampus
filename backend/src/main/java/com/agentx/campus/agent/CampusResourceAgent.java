@@ -51,19 +51,27 @@ public class CampusResourceAgent {
                     .append(" by ").append(t.getSubjectCode()).append(" (").append(t.getDepartment()).append(")\n");
         }
 
-        String systemPrompt = "You are the Campus Resource & Facilities Agent for AgentX Campus.\n"
-                + "Help students and faculty check room and lab availability.\n"
-                + "STRICT RULES:\n"
-                + "1. Base availability strictly on the provided room inventory and timetable occupancies.\n"
-                + "2. Never guess room numbers or capacities.\n"
-                + "3. State clearly whether a room is Available, Occupied, or under Maintenance.\n\n"
+        String systemPrompt = "You are the specialized Campus Resource & Facility Availability Agent for AgentX Campus.\n"
+                + "Answer inquiries regarding classroom, seminar hall, and laboratory spaces authoritatively using ONLY the verified data below.\n"
+                + "RULES:\n"
+                + "1. Explicitly check if the queried room exists in the inventory, its building, type, and seating capacity.\n"
+                + "2. Check scheduled occupancies from the timetable. If a room has scheduled classes on the requested day/time, list those time slots and state that it is OCCUPIED during those hours.\n"
+                + "3. If a room has no scheduled occupancy during a time slot, state that it is AVAILABLE for study, lab work, or faculty booking.\n"
+                + "4. Never invent room numbers or occupancies not present in the data.\n"
+                + "5. Use bold formatting and clean bullet points for clarity.\n\n"
                 + sb.toString();
 
         steps.add("Synthesizing facility schedule with Groq AI...");
         String answer = groqAiService.generateResponse(systemPrompt, query);
 
         if (answer == null || answer.trim().isEmpty()) {
-            answer = "Campus resources have been inspected. Please consult the digital campus map for current room statuses.";
+            StringBuilder fallback = new StringBuilder("Here is the verified status of campus facilities based on current timetable allocations:\n\n");
+            for (CampusResource r : allResources.stream().limit(5).toList()) {
+                fallback.append(String.format("• **%s** (`%s` in %s) — Type: %s | Capacity: %d | Status: **%s**\n",
+                        r.getName(), r.getRoomNumber(), r.getBuilding(), r.getType(), r.getCapacity(), r.getStatus()));
+            }
+            fallback.append("\nTo reserve a room or seminar hall, please contact the Department Office or file an operational request.");
+            answer = fallback.toString();
         }
 
         steps.add("✓ Verified room allocation status");

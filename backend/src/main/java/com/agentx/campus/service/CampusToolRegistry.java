@@ -14,6 +14,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.TextStyle;
 import java.util.*;
+import java.util.regex.Pattern;
 
 @Service
 public class CampusToolRegistry {
@@ -106,6 +107,232 @@ public class CampusToolRegistry {
         User user = userRepository.findByUsername(username).orElse(null);
         if (user == null) return Collections.emptyList();
         return attendanceRecordRepository.findByUserOrderByCourseCodeAsc(user);
+    }
+
+    public User findStudentInQuery(String query) {
+        if (query == null || query.trim().isEmpty()) return null;
+        String q = query.toLowerCase().trim();
+
+        List<StudentProfile> allProfiles = studentProfileRepository.findAll();
+
+        // 1. Exact or partial roll number match
+        for (StudentProfile sp : allProfiles) {
+            if (sp.getRollNumber() != null && !sp.getRollNumber().isEmpty()) {
+                if (q.contains(sp.getRollNumber().toLowerCase())) {
+                    return sp.getUser();
+                }
+            }
+        }
+
+        // 2. Exact full name match
+        for (StudentProfile sp : allProfiles) {
+            User u = sp.getUser();
+            if (u != null) {
+                String fullName = (u.getFirstName() + " " + u.getLastName()).toLowerCase().trim();
+                if (q.contains(fullName)) {
+                    return u;
+                }
+                if (u.getUsername() != null && q.contains(u.getUsername().toLowerCase())) {
+                    return u;
+                }
+            }
+        }
+
+        // 3. First name / Last name individual match (for distinct non-trivial names > 3 chars)
+        for (StudentProfile sp : allProfiles) {
+            User u = sp.getUser();
+            if (u != null) {
+                String first = u.getFirstName() != null ? u.getFirstName().toLowerCase().trim() : "";
+                String last = u.getLastName() != null ? u.getLastName().toLowerCase().trim() : "";
+                if (first.length() > 3 && q.contains(first)) {
+                    return u;
+                }
+                if (last.length() > 3 && q.contains(last)) {
+                    return u;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    public Course findCourseInQuery(String query) {
+        if (query == null || query.trim().isEmpty()) return null;
+        String q = query.toLowerCase().trim();
+
+        List<Course> allCourses = courseRepository.findAll();
+
+        // 1. Match by course code (e.g. CS301, CS302, CS303, etc.)
+        for (Course c : allCourses) {
+            if (c.getCourseCode() != null && !c.getCourseCode().isEmpty()) {
+                String code = c.getCourseCode().toLowerCase();
+                if (q.matches(".*\\b" + Pattern.quote(code) + "\\b.*")) {
+                    return c;
+                }
+            }
+        }
+
+        // 2. Match by exact course name or normalized course name
+        for (Course c : allCourses) {
+            if (c.getCourseName() != null && !c.getCourseName().isEmpty()) {
+                String name = c.getCourseName().toLowerCase();
+                if (q.contains(name)) {
+                    return c;
+                }
+                String singular = name.endsWith("s") ? name.substring(0, name.length() - 1) : name;
+                if (q.contains(singular)) {
+                    return c;
+                }
+            }
+        }
+
+        // 3. Common abbreviations and subject keywords
+        Map<String, String> acronyms = Map.ofEntries(
+                Map.entry("os", "CS303"),
+                Map.entry("operating system", "CS303"),
+                Map.entry("operating systems", "CS303"),
+                Map.entry("dbms", "CS301"),
+                Map.entry("database", "CS301"),
+                Map.entry("database management", "CS301"),
+                Map.entry("cn", "CS302"),
+                Map.entry("networks", "CS302"),
+                Map.entry("computer network", "CS302"),
+                Map.entry("computer networks", "CS302"),
+                Map.entry("ai", "CS304"),
+                Map.entry("artificial intelligence", "CS304"),
+                Map.entry("machine learning", "CS304"),
+                Map.entry("toc", "CS305"),
+                Map.entry("theory of computation", "CS305"),
+                Map.entry("automata", "CS305"),
+                Map.entry("cloud", "CS306"),
+                Map.entry("cloud computing", "CS306"),
+                Map.entry("compiler", "CS351"),
+                Map.entry("compiler design", "CS351"),
+                Map.entry("distributed", "CS352"),
+                Map.entry("distributed systems", "CS352"),
+                Map.entry("full stack", "CS353"),
+                Map.entry("web tech", "CS353"),
+                Map.entry("crypto", "CS354"),
+                Map.entry("cryptography", "CS354"),
+                Map.entry("dsa", "CS201"),
+                Map.entry("data structures", "CS201"),
+                Map.entry("oop", "CS203"),
+                Map.entry("java", "CS203"),
+                Map.entry("discrete math", "CS204")
+        );
+
+        for (Map.Entry<String, String> entry : acronyms.entrySet()) {
+            if (q.matches(".*\\b" + Pattern.quote(entry.getKey()) + "\\b.*") || q.contains(entry.getKey())) {
+                String targetCode = entry.getValue();
+                return allCourses.stream()
+                        .filter(c -> targetCode.equalsIgnoreCase(c.getCourseCode()))
+                        .findFirst()
+                        .orElse(null);
+            }
+        }
+
+        return null;
+    }
+
+    public boolean isAttendanceIntent(String query) {
+        if (query == null || query.trim().isEmpty()) return false;
+        String q = query.toLowerCase().trim();
+
+        // 1. Regex capturing "attendance" with common typos: "attendnance", "atendance", "attandance", "attendence", "attndance", "att"
+        if (q.matches("(?i).*\\b(at+en+d+[ae]n[sc]+e?|attendnance|atendance|attandance|attandence|attendence|attndance|attendence|attnd)\\b.*")) {
+            return true;
+        }
+
+        // 2. Class attendance phrasing
+        if (q.contains("classes attended") || q.contains("classes have i attended") ||
+            q.contains("how many classes") || q.contains("class attendance") ||
+            q.contains("classes missed") || q.contains("attendance of") ||
+            q.contains("attendance for") || q.contains("attendance in") ||
+            q.contains("my attendance") || q.contains("attendance percentage") ||
+            q.contains("attendance rate") || q.contains("attendance standing") ||
+            q.contains("check attendance") || q.contains("show attendance") ||
+            q.contains("present in") || q.contains("absent in")) {
+            return true;
+        }
+
+        // 3. Typo distance check: check each word against "attendance"
+        String[] words = q.split("[^a-zA-Z]+");
+        for (String w : words) {
+            if (w.length() >= 5 && (w.startsWith("at") || w.startsWith("att"))) {
+                if (levenshteinDistance(w, "attendance") <= 2 || levenshteinDistance(w, "attend") <= 1) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private int levenshteinDistance(String a, String b) {
+        int[] costs = new int[b.length() + 1];
+        for (int j = 0; j < costs.length; j++) costs[j] = j;
+        for (int i = 1; i <= a.length(); i++) {
+            costs[0] = i;
+            int nw = i - 1;
+            for (int j = 1; j <= b.length(); j++) {
+                int cj = Math.min(1 + Math.min(costs[j], costs[j - 1]),
+                        a.charAt(i - 1) == b.charAt(j - 1) ? nw : nw + 1);
+                nw = costs[j];
+                costs[j] = cj;
+            }
+        }
+        return costs[b.length()];
+    }
+
+    public boolean isAuthorizedToViewStudent(String requesterUsername, User targetStudent) {
+        if (requesterUsername == null || targetStudent == null) return false;
+        User requester = userRepository.findByUsername(requesterUsername).orElse(null);
+        if (requester == null) return false;
+
+        // 1. The student themselves is always authorized to view their own data
+        if (requester.getId().equals(targetStudent.getId())) {
+            return true;
+        }
+
+        // 2. Administrators have campus-wide access
+        if (requester.getRole() == Role.ADMIN) {
+            return true;
+        }
+
+        // 3. Faculty / HOD can view students in their department or mentored section
+        if (requester.getRole() == Role.FACULTY || requester.getRole() == Role.HOD) {
+            StudentProfile sp = studentProfileRepository.findByUser(targetStudent).orElse(null);
+            if (sp == null) return false;
+
+            // Check if HOD of the student's department
+            if (requester.getRole() == Role.HOD) {
+                FacultyProfile fp = facultyProfileRepository.findByUser(requester).orElse(null);
+                if (fp != null && fp.getAssignedDepartment() != null &&
+                        fp.getAssignedDepartment().equalsIgnoreCase(sp.getDepartment())) {
+                    return true;
+                }
+            }
+
+            // Check if mentor of the student's section
+            List<FacultyMentorSection> mappings = facultyMentorSectionRepository.findByDepartmentAndSection(
+                    sp.getDepartment(), sp.getSection()
+            );
+            for (FacultyMentorSection m : mappings) {
+                if (m.getFacultyProfile() != null && m.getFacultyProfile().getUser() != null &&
+                        m.getFacultyProfile().getUser().getId().equals(requester.getId())) {
+                    return true;
+                }
+            }
+
+            // Fallback: faculty teaching in the same department
+            FacultyProfile fp = facultyProfileRepository.findByUser(requester).orElse(null);
+            if (fp != null && fp.getAssignedDepartment() != null &&
+                    fp.getAssignedDepartment().equalsIgnoreCase(sp.getDepartment())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public List<Assignment> getAssignments(String department, String section) {

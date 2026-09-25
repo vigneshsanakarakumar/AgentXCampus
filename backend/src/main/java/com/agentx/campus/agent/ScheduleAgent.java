@@ -104,11 +104,15 @@ public class ScheduleAgent {
             context.append(String.format("  * [%s] %s: %s\n", n.getPriority(), n.getTitle(), n.getContent()));
         }
 
-        String prompt = "You are the specialized Schedule Agent for AgentX Campus.\n"
-                + "Answer the question directly and concisely using the schedule and event data below.\n"
-                + (isFaculty ? "Clearly list the classes they teach with time slots, sections, and classrooms.\n"
-                            : "Clearly list classes with their time slots, classrooms, and instructors.\n")
-                + "If asked about events, state dates, times, and venues.\n\n"
+        String prompt = "You are the specialized Schedule & Timetable Intelligence Agent for AgentX Campus.\n"
+                + "Answer the inquiry authoritatively using ONLY the verified timetable, notices, and events data below.\n"
+                + "GUIDELINES:\n"
+                + "1. State today's date and day of the week (" + LocalDate.now() + ", " + todayDay + ") when answering about today's classes.\n"
+                + (isFaculty ? "2. For faculty inquiries, organize lectures chronologically with exact start-end times, subject name, subject code, target department, section, and room number.\n"
+                            : "2. For student inquiries, organize classes chronologically with exact start-end times, subject name, subject code, room number, and instructor name.\n")
+                + "3. If there are no scheduled classes for the requested day, state that clearly and offer productive study/lab recommendations.\n"
+                + "4. If asked about campus events or circulars, clearly present event title, category, date, time, location/venue, and organizing body.\n"
+                + "5. Use clean markdown formatting with bullet points and bold headers.\n\n"
                 + context.toString();
 
         steps.add("Reasoning with Groq AI using verified timetable facts...");

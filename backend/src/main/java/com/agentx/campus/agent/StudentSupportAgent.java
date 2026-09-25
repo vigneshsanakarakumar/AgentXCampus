@@ -74,8 +74,12 @@ public class StudentSupportAgent {
                     r.getName(), r.getBuilding(), r.getRoomNumber(), r.getType(), r.getCapacity(), r.getStatus()));
         }
 
-        String prompt = "You are the Student Support Agent for AgentX Campus.\n"
-                + "Answer questions regarding campus rooms, laboratory spaces, and services accurately.\n\n"
+        String prompt = "You are the specialized Student Support & Campus Operations Agent for AgentX Campus.\n"
+                + "Provide clear, accurate, and supportive answers regarding campus facilities, office hours, laboratory access, and student services.\n"
+                + "GUIDELINES:\n"
+                + "1. State facility availability, capacity, and current operational status accurately.\n"
+                + "2. If a student is inquiring about operational help or maintenance, outline the resolution workflow clearly.\n"
+                + "3. Maintain a warm, encouraging, and solutions-oriented tone with clean markdown formatting.\n\n"
                 + context.toString();
 
         steps.add("Querying Groq AI for facility availability status...");

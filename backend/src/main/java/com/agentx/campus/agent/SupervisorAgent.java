@@ -32,6 +32,8 @@ public class SupervisorAgent {
     private final AgentTaskLogRepository taskLogRepository;
     private final AiConversationRepository conversationRepository;
     private final AiMessageRepository messageRepository;
+    private final com.agentx.campus.service.GroqAiService groqAiService;
+    private final com.agentx.campus.service.CampusToolRegistry toolRegistry;
 
     public SupervisorAgent(
             AcademicAgent academicAgent,
@@ -47,7 +49,9 @@ public class SupervisorAgent {
             UserRepository userRepository,
             AgentTaskLogRepository taskLogRepository,
             AiConversationRepository conversationRepository,
-            AiMessageRepository messageRepository) {
+            AiMessageRepository messageRepository,
+            com.agentx.campus.service.GroqAiService groqAiService,
+            com.agentx.campus.service.CampusToolRegistry toolRegistry) {
         this.academicAgent = academicAgent;
         this.documentRagAgent = documentRagAgent;
         this.scheduleAgent = scheduleAgent;
@@ -62,6 +66,8 @@ public class SupervisorAgent {
         this.taskLogRepository = taskLogRepository;
         this.conversationRepository = conversationRepository;
         this.messageRepository = messageRepository;
+        this.groqAiService = groqAiService;
+        this.toolRegistry = toolRegistry;
     }
 
     public AgentChatResponse routeAndExecute(String username, String query) {
@@ -86,10 +92,6 @@ public class SupervisorAgent {
             intent = "Attendance Session Explainer";
             toolsUsed = "explainAttendanceEntry, getAttendance, findLeaveRequest";
             response = academicAgent.process(username, query);
-        } else if (isPlanningQuery(lower)) {
-            intent = "Task Planning";
-            toolsUsed = "getAssignments, getCourses, createStudentTask";
-            response = taskPlanningAgent.process(username, query);
         } else if (isGrievanceQuery(lower)) {
             intent = "Campus Grievance & Incident Dispatch";
             toolsUsed = "extractStructuredMetadata, createGrievance, notifyUser";
@@ -98,29 +100,83 @@ public class SupervisorAgent {
             intent = "Campus Resource & Facility Availability";
             toolsUsed = "findAllResources, getTimetableOccupancies, verifyFacilitySchedule";
             response = campusResourceAgent.process(username, query);
-        } else if (isSupportQuery(lower)) {
-            intent = "Campus Operations & Support";
-            toolsUsed = "getCampusResources, createGrievance";
-            response = studentSupportAgent.process(username, query);
-        } else if (isScheduleQuery(lower)) {
-            intent = "Academic Schedule & Events";
-            toolsUsed = "getTodaySchedule, getWeeklySchedule, getUpcomingEvents";
-            response = scheduleAgent.process(username, query);
         } else if (isDocumentRagQuery(lower)) {
-            // Query Classifier -> YES: Institutional Policy & Regulations RAG
             intent = "Institutional Policy & Regulations (RAG)";
             toolsUsed = "searchKnowledgeBase, semanticVectorRagRetrieval";
             response = documentRagAgent.process(username, query);
             sourcesCount = (response.getActionData() instanceof java.util.Map<?, ?> map && map.containsKey("sources")) ? 3 : 1;
+        } else if (isPlanningQuery(lower)) {
+            intent = "Task Planning";
+            toolsUsed = "getAssignments, getCourses, createStudentTask";
+            response = taskPlanningAgent.process(username, query);
         } else if (isAcademicRegistryQuery(lower)) {
             intent = "Academic Registry";
             toolsUsed = "getAttendance, getAssignments, getCourses, getStudentProfile";
             response = academicAgent.process(username, query);
+        } else if (isScheduleQuery(lower)) {
+            intent = "Academic Schedule & Events";
+            toolsUsed = "getTodaySchedule, getWeeklySchedule, getUpcomingEvents";
+            response = scheduleAgent.process(username, query);
         } else {
-            // Query Classifier -> NO: General AI Copilot
-            intent = "General AI Copilot";
-            toolsUsed = "generalAiReasoning";
-            response = generalAiAgent.process(username, query);
+            // 2. Intelligent AI Intent Classification before fallback
+            String aiCategory = classifyIntentWithAi(query);
+            switch (aiCategory) {
+                case "ACADEMIC":
+                    intent = "Academic Registry (AI Routed)";
+                    toolsUsed = "getAttendance, getAssignments, getCourses, getStudentProfile";
+                    response = academicAgent.process(username, query);
+                    break;
+                case "SCHEDULE":
+                    intent = "Academic Schedule & Events (AI Routed)";
+                    toolsUsed = "getTodaySchedule, getWeeklySchedule, getUpcomingEvents";
+                    response = scheduleAgent.process(username, query);
+                    break;
+                case "DOCUMENT_RAG":
+                    intent = "Institutional Policy & Regulations (RAG - AI Routed)";
+                    toolsUsed = "searchKnowledgeBase, semanticVectorRagRetrieval";
+                    response = documentRagAgent.process(username, query);
+                    sourcesCount = 3;
+                    break;
+                case "ELIGIBILITY":
+                    intent = "Academic Eligibility & Rule Engine (AI Routed)";
+                    toolsUsed = "getStudentProfile, getExamSchedule, getAttendanceRecord, evaluateEligibilityRuleEngine";
+                    response = academicEligibilityEngine.evaluateStudentExamEligibility(username, query);
+                    sourcesCount = 1;
+                    break;
+                case "EXAM_CONFLICT":
+                    intent = "Examination Conflict & Scheduling (AI Routed)";
+                    toolsUsed = "checkExamConflicts, getTimetableOccupancies";
+                    response = examinationAgent.process(username, query);
+                    break;
+                case "GRIEVANCE":
+                    intent = "Campus Grievance & Incident Dispatch (AI Routed)";
+                    toolsUsed = "extractStructuredMetadata, createGrievance, notifyUser";
+                    response = grievanceAgent.process(username, query);
+                    break;
+                case "RESOURCE":
+                    intent = "Campus Resource & Facility Availability (AI Routed)";
+                    toolsUsed = "findAllResources, getTimetableOccupancies";
+                    response = campusResourceAgent.process(username, query);
+                    break;
+                case "TASK_PLANNING":
+                    intent = "Task Planning (AI Routed)";
+                    toolsUsed = "getAssignments, getCourses, createStudentTask";
+                    response = taskPlanningAgent.process(username, query);
+                    break;
+                default:
+                    // 3. Fallback Safeguard (Requirement 6): Check if query references specific campus data
+                    if (hasSpecificCampusDataIntent(query)) {
+                        intent = "Academic Registry (Campus Data Safeguard)";
+                        toolsUsed = "findStudentInQuery, getAttendance, getStudentProfile";
+                        response = academicAgent.process(username, query);
+                    } else {
+                        // Truly open-ended non-campus query
+                        intent = "General AI Copilot";
+                        toolsUsed = "generalAiReasoning";
+                        response = generalAiAgent.process(username, query);
+                    }
+                    break;
+            }
         }
 
         // Prepend Orchestrator classification step
@@ -227,11 +283,25 @@ public class SupervisorAgent {
     }
 
     private boolean isAcademicRegistryQuery(String q) {
-        return q.contains("my attendance") || q.contains("my course") || q.contains("my subject") ||
-                q.contains("my assignment") || q.contains("my mark") || q.contains("my cgpa") ||
-                q.contains("my grade") || q.contains("my profile") || q.contains("my task") ||
-                (q.contains("attendance") && (q.contains("my") || q.contains("current") || q.contains("score") || q.contains("record"))) ||
-                (q.contains("assignment") && (q.contains("my") || q.contains("pending") || q.contains("due")));
+        boolean attendanceIntent = toolRegistry != null && toolRegistry.isAttendanceIntent(q);
+        boolean courseMentioned = toolRegistry != null && toolRegistry.findCourseInQuery(q) != null;
+        boolean studentMentioned = toolRegistry != null && toolRegistry.findStudentInQuery(q) != null;
+
+        if (attendanceIntent || studentMentioned) {
+            return true;
+        }
+
+        if (courseMentioned && (attendanceIntent || q.contains("mark") || q.contains("grade") ||
+                q.contains("score") || q.contains("class") || q.contains("how many") ||
+                q.contains("wat") || q.contains("what") || q.contains("my") || q.contains("please"))) {
+            return true;
+        }
+
+        return q.contains("attendance") || q.contains("course") || q.contains("subject") ||
+                q.contains("assignment") || q.contains("mark") || q.contains("cgpa") ||
+                q.contains("grade") || q.contains("profile") || q.contains("task") ||
+                q.contains("enrollment") || q.contains("credits") || q.contains("syllabus") ||
+                q.contains("internal mark") || q.contains("faculty mentor");
     }
 
     private boolean isScheduleQuery(String q) {
@@ -239,5 +309,86 @@ public class SupervisorAgent {
                 q.contains("lecture") || q.contains("timetable") || q.contains("events") ||
                 q.contains("hackathon") || q.contains("symposium") || q.contains("notice") ||
                 q.contains("circular") || q.contains("when is");
+    }
+
+    private String classifyIntentWithAi(String query) {
+        if (groqAiService == null) {
+            return fallbackClassifier(query);
+        }
+        try {
+            String classificationPrompt = "You are the AgentX Campus Multi-Agent Intent Classifier.\n"
+                    + "Classify the user inquiry into EXACTLY ONE of these categories:\n"
+                    + "- ACADEMIC: Student attendance, subject-wise attendance (e.g. 'Lavanya Sundar attendance', 'attendnance of Operating System', 'wat is my os attendance', 'OS attendance please', 'how many classes have I attended in Operating System'), grades, marks, CGPA, courses, assignments, student academic profile. Tolerate spelling mistakes (e.g. 'attendnance', 'atendance'), abbreviations (e.g. 'OS', 'DBMS', 'CN', 'AI', 'TOC'), and informal phrasing.\n"
+                    + "- SCHEDULE: Daily class timetable, class periods, faculty teaching schedule, events, workshops, notices, hackathons.\n"
+                    + "- DOCUMENT_RAG: Institutional regulations, academic handbook rules, hostel curfew, outpass/gate pass policy, condonation fee, credit requirements.\n"
+                    + "- ELIGIBILITY: Exam write eligibility, hall ticket/admit card clearance, 68% attendance condonation rule.\n"
+                    + "- EXAM_CONFLICT: Exam scheduling collisions, classroom exam conflicts, time slot clashes.\n"
+                    + "- GRIEVANCE: Reporting broken facilities, projector/AC/fan malfunctions, water leaks, filing complaints.\n"
+                    + "- RESOURCE: Classroom/laboratory availability, checking if a room or hall is empty/free.\n"
+                    + "- TASK_PLANNING: Multi-step study plans, preparation roadmaps for subjects, auto-generating study tasks.\n"
+                    + "- GENERAL: Open-ended non-campus inquiries, general coding, algorithms, greetings, math.\n\n"
+                    + "Return ONLY the uppercase category word (e.g. ACADEMIC, SCHEDULE, DOCUMENT_RAG, etc.). Do not include explanations or markdown.";
+
+            String res = groqAiService.generateResponse(classificationPrompt, query);
+            if (res != null) {
+                String clean = res.trim().toUpperCase();
+                for (String cat : List.of("ACADEMIC", "SCHEDULE", "DOCUMENT_RAG", "ELIGIBILITY", "EXAM_CONFLICT", "GRIEVANCE", "RESOURCE", "TASK_PLANNING", "GENERAL")) {
+                    if (clean.contains(cat)) {
+                        return cat;
+                    }
+                }
+            }
+        } catch (Exception ex) {
+            // Ignore failure, fall back to heuristic
+        }
+        return fallbackClassifier(query);
+    }
+
+    private String fallbackClassifier(String query) {
+        if (query == null) return "GENERAL";
+        String q = query.toLowerCase().trim();
+        if (toolRegistry != null) {
+            if (toolRegistry.isAttendanceIntent(q) || toolRegistry.findCourseInQuery(q) != null || toolRegistry.findStudentInQuery(q) != null) {
+                return "ACADEMIC";
+            }
+        }
+        if (isScheduleQuery(q)) return "SCHEDULE";
+        if (isDocumentRagQuery(q)) return "DOCUMENT_RAG";
+        if (isGrievanceQuery(q)) return "GRIEVANCE";
+        if (isResourceQuery(q)) return "RESOURCE";
+        if (isPlanningQuery(q)) return "TASK_PLANNING";
+        if (isEligibilityQuery(q)) return "ELIGIBILITY";
+        if (isExamConflictQuery(q)) return "EXAM_CONFLICT";
+        return "GENERAL";
+    }
+
+    private boolean hasSpecificCampusDataIntent(String query) {
+        if (query == null) return false;
+        String q = query.toLowerCase();
+
+        // 1. References a known student name or roll number in DB
+        if (toolRegistry != null && toolRegistry.findStudentInQuery(query) != null) {
+            return true;
+        }
+
+        // 2. References a course/subject in DB or acronym (e.g. Operating System, OS, DBMS)
+        if (toolRegistry != null && toolRegistry.findCourseInQuery(query) != null) {
+            return true;
+        }
+
+        // 3. Contains attendance intent (even with typos: "attendnance", "atendance")
+        if (toolRegistry != null && toolRegistry.isAttendanceIntent(query)) {
+            return true;
+        }
+
+        // 4. Contains standard university subject code pattern (e.g. CS301, CS302, IT202, EC...)
+        if (query.matches(".*\\b[A-Za-z]{2,4}[0-9]{3}\\b.*")) {
+            return true;
+        }
+
+        // 5. References section, attendance, or academic terms
+        return q.contains("section a") || q.contains("section b") || q.contains("section c") ||
+               q.contains("attendance") || q.contains("cgpa") || q.contains("marks") ||
+               q.contains("timetable") || q.contains("syllabus") || q.contains("faculty mentor");
     }
 }
