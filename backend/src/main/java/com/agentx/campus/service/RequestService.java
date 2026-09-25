@@ -28,6 +28,7 @@ public class RequestService {
     private final AttendanceSessionRepository sessionRepo;
     private final AttendanceEntryRepository entryRepo;
     private final NotificationAgent notificationAgent;
+    private final com.agentx.campus.repository.AuditLogRepository auditLogRepository;
 
     public RequestService(UserRepository userRepository,
                           StudentProfileRepository studentProfileRepository,
@@ -37,7 +38,8 @@ public class RequestService {
                           DocumentRequestRepository docRepo,
                           AttendanceSessionRepository sessionRepo,
                           AttendanceEntryRepository entryRepo,
-                          NotificationAgent notificationAgent) {
+                          NotificationAgent notificationAgent,
+                          com.agentx.campus.repository.AuditLogRepository auditLogRepository) {
         this.userRepository = userRepository;
         this.studentProfileRepository = studentProfileRepository;
         this.mentorSectionRepository = mentorSectionRepository;
@@ -47,6 +49,7 @@ public class RequestService {
         this.sessionRepo = sessionRepo;
         this.entryRepo = entryRepo;
         this.notificationAgent = notificationAgent;
+        this.auditLogRepository = auditLogRepository;
     }
 
     // ─── PRIVATE HELPERS ─────────────────────────────────────────────────────
@@ -88,13 +91,33 @@ public class RequestService {
 
         User approver = resolveApprover(username);
 
+        LocalDate fromDate = parseDate(body.get("fromDate"));
+        LocalDate toDate = parseDate(body.get("toDate"));
+        if (fromDate == null) fromDate = LocalDate.now();
+        if (toDate == null) toDate = fromDate;
+
+        // Date range validation
+        if (toDate.isBefore(fromDate)) {
+            throw new IllegalArgumentException("\"To Date\" cannot be earlier than \"From Date\".");
+        }
+
+        // Duplicate / overlapping leave request prevention
+        final LocalDate finalFrom = fromDate;
+        final LocalDate finalTo = toDate;
+        List<LeaveRequest> existing = leaveRepo.findByStudentOrderByCreatedAtDesc(student);
+        boolean overlaps = existing.stream()
+                .filter(l -> ("PENDING".equalsIgnoreCase(l.getStatus()) || "APPROVED".equalsIgnoreCase(l.getStatus()))
+                        && l.getFromDate() != null && l.getToDate() != null)
+                .anyMatch(l -> !finalFrom.isAfter(l.getToDate()) && !finalTo.isBefore(l.getFromDate()));
+        if (overlaps) {
+            throw new IllegalArgumentException("A pending or approved leave request already covers these dates.");
+        }
+
         LeaveRequest req = new LeaveRequest();
         req.setStudent(student);
         req.setLeaveType(body.getOrDefault("leaveType", "PERSONAL").toString().toUpperCase());
-        req.setFromDate(parseDate(body.get("fromDate")));
-        req.setToDate(parseDate(body.get("toDate")));
-        if (req.getFromDate() == null) req.setFromDate(LocalDate.now());
-        if (req.getToDate() == null) req.setToDate(req.getFromDate());
+        req.setFromDate(fromDate);
+        req.setToDate(toDate);
         req.setPeriod(body.containsKey("period") ? body.get("period").toString() : null);
         req.setReason(body.getOrDefault("reason", "").toString());
         req.setAttachmentUrl(body.containsKey("attachmentUrl") ? body.get("attachmentUrl").toString() : null);
@@ -102,6 +125,15 @@ public class RequestService {
         req.setAssignedToUser(approver);
         req.setAssignedToRole(approver != null && "ADMIN".equals(approver.getRole().name()) ? "ADMIN" : "FACULTY");
         req = leaveRepo.save(req);
+
+        // Audit Log
+        try {
+            auditLogRepository.save(new com.agentx.campus.model.AuditLog(
+                    student, "LEAVE_SUBMITTED", "LeaveRequest", req.getId(), username,
+                    student.getRole() != null ? student.getRole().name() : "STUDENT",
+                    String.format("Leave submitted: %s to %s (%s)", req.getFromDate(), req.getToDate(), req.getLeaveType()),
+                    "SUCCESS"));
+        } catch (Exception ignored) {}
 
         // Notify the approver
         try {
@@ -143,7 +175,13 @@ public class RequestService {
             throw new AccessDeniedException("Not authorized to update this leave request.");
         }
 
-        req.setStatus(status.toUpperCase());
+        String targetStatus = status.toUpperCase();
+        // Idempotent check: if already in target status, return directly
+        if (targetStatus.equals(req.getStatus())) {
+            return req;
+        }
+
+        req.setStatus(targetStatus);
         req.setResolutionNotes(notes);
         if ("APPROVED".equals(req.getStatus()) || "REJECTED".equals(req.getStatus())) {
             req.setResolvedAt(LocalDateTime.now());
@@ -154,6 +192,16 @@ public class RequestService {
         if ("APPROVED".equals(req.getStatus())) {
             cascadeLeaveToAttendance(req);
         }
+
+        // Audit Log
+        try {
+            auditLogRepository.save(new com.agentx.campus.model.AuditLog(
+                    req.getStudent(), "LEAVE_" + req.getStatus(), "LeaveRequest", req.getId(), mentorUsername,
+                    mentor.getRole() != null ? mentor.getRole().name() : "FACULTY",
+                    String.format("Leave status updated to %s: %s to %s with notes: %s",
+                            req.getStatus(), req.getFromDate(), req.getToDate(), notes != null ? notes : ""),
+                    "SUCCESS"));
+        } catch (Exception ignored) {}
 
         // Notify student
         try {

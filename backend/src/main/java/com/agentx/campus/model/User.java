@@ -54,6 +54,10 @@ public class User {
         this.updatedAt = LocalDateTime.now();
     }
 
+    public User(String username, String passwordHash, String email, Role role) {
+        this(username, email, passwordHash, role, username, "");
+    }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

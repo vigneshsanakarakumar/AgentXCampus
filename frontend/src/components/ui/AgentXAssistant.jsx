@@ -3,7 +3,7 @@ import api from '../../services/api';
 import Card, { CardHeader } from './Card';
 import Button from './Button';
 import Badge from './Badge';
-import { Bot, Send, Loader2, Wrench, CheckSquare, Layers, BookOpen, Sparkles } from 'lucide-react';
+import { Bot, Send, Loader2, Wrench, CheckSquare, Layers, BookOpen, Sparkles, ShieldCheck } from 'lucide-react';
 
 export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
   const [query, setQuery] = useState(initialQuery);
@@ -18,11 +18,11 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
   const [currentStep, setCurrentStep] = useState('');
 
   const suggestions = [
-    "What is the condonation fee if my attendance is 68%?",
-    "Can hostellers leave on Saturday without parents call?",
-    "Can you write a bubble sort in Python?",
+    "My attendance is 68%. Help me fix it.",
+    "I took leave on September 10 and September 17. Show my leave history.",
+    "What is the minimum attendance requirement?",
+    "Prepare me for my upcoming exam.",
     "What classes do I have today?",
-    "When is my DBMS assignment due?",
     "The projector in CS-204 is not working."
   ];
 
@@ -123,6 +123,8 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
                 detectedAgentType = parsed.agentType || detectedAgentType;
                 actionData = parsed.actionData || null;
                 latencyMs = parsed.latencyMs || null;
+                const executionPlan = parsed.executionPlan || null;
+                const verification = parsed.verification || null;
                 if (parsed.steps && parsed.steps.length > 0) {
                   finalSteps = parsed.steps;
                 }
@@ -138,6 +140,8 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
                     last.actionData = actionData;
                     last.latencyMs = latencyMs;
                     last.steps = finalSteps;
+                    last.executionPlan = executionPlan;
+                    last.verification = verification;
                     last.streaming = false;
                   }
                   return updated;
@@ -176,6 +180,8 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
             last.steps = data.steps || [];
             last.actionData = data.actionData;
             last.latencyMs = data.latencyMs;
+            last.executionPlan = data.executionPlan || null;
+            last.verification = data.verification || null;
             last.streaming = false;
           }
           return updated;
@@ -289,6 +295,54 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
                   {m.actionData.tasksCreated.map((t, tIdx) => (
                     <p key={tIdx} className="text-[10px]">✓ {t}</p>
                   ))}
+                </div>
+              )}
+
+              {/* Deterministic Verification Result */}
+              {m.verification && (
+                <div className="mt-3 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 font-bold text-xs">
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                      <span>Verification Check: {m.verification.status}</span>
+                    </div>
+                    <span className="text-[9px] font-mono text-emerald-700 dark:text-emerald-400">
+                      {m.verification.verifiedBy}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-emerald-900 dark:text-emerald-200">{m.verification.message}</p>
+                  {m.verification.checksPerformed && m.verification.checksPerformed.length > 0 && (
+                    <div className="pt-1 border-t border-emerald-500/20 text-[9px] font-mono space-y-0.5">
+                      {m.verification.checksPerformed.map((c, cIdx) => (
+                        <p key={cIdx}>✓ {c}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Orchestrator Execution Plan */}
+              {m.executionPlan && m.executionPlan.steps && m.executionPlan.steps.length > 0 && (
+                <div className="mt-3 p-2.5 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)] text-[var(--color-foreground)] space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-[var(--color-primary)]">
+                    <div className="flex items-center gap-1.5">
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>Orchestrator Plan: {m.executionPlan.intent}</span>
+                    </div>
+                    <Badge variant="primary" size="sm">{m.executionPlan.status}</Badge>
+                  </div>
+                  <div className="space-y-1 pt-1 font-mono text-[9px]">
+                    {m.executionPlan.steps.map((s, sIdx) => (
+                      <div key={sIdx} className="flex items-center justify-between p-1 rounded bg-[var(--color-background)] border border-[var(--color-border)]/50">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[var(--color-primary)] font-bold">{s.step}.</span>
+                          <span className="font-semibold">{s.agent}</span>
+                          <span className="text-[var(--color-muted-foreground)]">({s.tool})</span>
+                        </div>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-bold">{s.status}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               )}
 

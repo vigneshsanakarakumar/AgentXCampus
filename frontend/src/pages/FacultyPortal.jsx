@@ -143,6 +143,10 @@ export const FacultyPortal = () => {
 
   const handleApplyLeave = async (e) => {
     e.preventDefault();
+    if (leaveForm.fromDate && leaveForm.toDate && leaveForm.toDate < leaveForm.fromDate) {
+      addToast('"To Date" cannot be earlier than "From Date".', 'error');
+      return;
+    }
     setSubmittingLeave(true);
     try {
       await api.post('/faculty/leave-requests', leaveForm);
@@ -1228,11 +1232,19 @@ export const FacultyPortal = () => {
                           <label className="block text-xs font-semibold text-[var(--color-foreground)] mb-1">To Date</label>
                           <input
                             type="date"
+                            min={leaveForm.fromDate}
                             value={leaveForm.toDate}
                             onChange={(e) => setLeaveForm({ ...leaveForm, toDate: e.target.value })}
                             required
-                            className="w-full text-xs p-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)]"
+                            className={`w-full text-xs p-2 rounded-lg border bg-[var(--color-card)] text-[var(--color-foreground)] ${
+                              leaveForm.fromDate && leaveForm.toDate && leaveForm.toDate < leaveForm.fromDate
+                                ? 'border-red-500'
+                                : 'border-[var(--color-border)]'
+                            }`}
                           />
+                          {leaveForm.fromDate && leaveForm.toDate && leaveForm.toDate < leaveForm.fromDate && (
+                            <p className="text-[10px] text-red-500 mt-1">"To Date" cannot be earlier than "From Date".</p>
+                          )}
                         </div>
                       </div>
 

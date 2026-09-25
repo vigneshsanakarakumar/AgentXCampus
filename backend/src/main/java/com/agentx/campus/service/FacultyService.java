@@ -456,6 +456,9 @@ public class FacultyService {
         String leaveType = body.getOrDefault("leaveType", "CASUAL_LEAVE").toString();
         LocalDate fromDate = LocalDate.parse(body.get("fromDate").toString());
         LocalDate toDate = LocalDate.parse(body.get("toDate").toString());
+        if (toDate.isBefore(fromDate)) {
+            throw new IllegalArgumentException("\"To Date\" cannot be earlier than \"From Date\".");
+        }
         String substitute = body.getOrDefault("substituteFacultyName", "").toString();
         String reason = body.getOrDefault("reason", "Personal leave request").toString();
 

@@ -108,6 +108,10 @@ public class HostelTransportService {
         try { req.setExpectedReturnDateTime(LocalDateTime.parse(body.get("expectedReturnDateTime").toString())); }
         catch (Exception e) { req.setExpectedReturnDateTime(LocalDateTime.now().plusHours(4)); }
 
+        if (req.getExpectedReturnDateTime().isBefore(req.getOutDateTime())) {
+            throw new IllegalArgumentException("Expected return time cannot be earlier than departure time.");
+        }
+
         req = gatePassRepo.save(req);
 
         try {

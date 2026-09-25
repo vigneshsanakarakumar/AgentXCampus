@@ -74,4 +74,5 @@ public class TimetableEntry {
 
     public String getClassroom() { return classroom; }
     public void setClassroom(String classroom) { this.classroom = classroom; }
+    public String getRoom() { return classroom; }
 }

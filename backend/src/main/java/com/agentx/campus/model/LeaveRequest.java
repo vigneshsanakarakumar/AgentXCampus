@@ -59,6 +59,7 @@ public class LeaveRequest {
 
     // --- Getters / Setters ---
     public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
     @JsonIgnore public User getStudent() { return student; }
     public void setStudent(User student) { this.student = student; }
     public String getLeaveType() { return leaveType; }
@@ -94,4 +95,20 @@ public class LeaveRequest {
         if (assignedToUser != null) return (assignedToUser.getFirstName() + " " + assignedToUser.getLastName()).trim();
         return "ADMIN".equals(assignedToRole) ? "Administration" : assignedToRole;
     }
+    public long getTotalDays() {
+        if (fromDate == null || toDate == null) return 1;
+        return java.time.temporal.ChronoUnit.DAYS.between(fromDate, toDate) + 1;
+    }
+
+    public java.util.List<String> getLeaveDates() {
+        if (fromDate == null || toDate == null) return java.util.Collections.emptyList();
+        java.util.List<String> dates = new java.util.ArrayList<>();
+        LocalDate cur = fromDate;
+        while (!cur.isAfter(toDate)) {
+            dates.add(cur.toString());
+            cur = cur.plusDays(1);
+        }
+        return dates;
+    }
 }
+

@@ -34,6 +34,7 @@ public class SupervisorAgent {
     private final AiMessageRepository messageRepository;
     private final com.agentx.campus.service.GroqAiService groqAiService;
     private final com.agentx.campus.service.CampusToolRegistry toolRegistry;
+    private final com.agentx.campus.service.AgentOrchestrator agentOrchestrator;
 
     public SupervisorAgent(
             AcademicAgent academicAgent,
@@ -51,7 +52,8 @@ public class SupervisorAgent {
             AiConversationRepository conversationRepository,
             AiMessageRepository messageRepository,
             com.agentx.campus.service.GroqAiService groqAiService,
-            com.agentx.campus.service.CampusToolRegistry toolRegistry) {
+            com.agentx.campus.service.CampusToolRegistry toolRegistry,
+            @org.springframework.context.annotation.Lazy com.agentx.campus.service.AgentOrchestrator agentOrchestrator) {
         this.academicAgent = academicAgent;
         this.documentRagAgent = documentRagAgent;
         this.scheduleAgent = scheduleAgent;
@@ -68,9 +70,18 @@ public class SupervisorAgent {
         this.messageRepository = messageRepository;
         this.groqAiService = groqAiService;
         this.toolRegistry = toolRegistry;
+        this.agentOrchestrator = agentOrchestrator;
     }
 
     public AgentChatResponse routeAndExecute(String username, String query) {
+        if (agentOrchestrator != null) {
+            try {
+                return agentOrchestrator.orchestrate(username, query);
+            } catch (Exception ex) {
+                // Fallback to internal supervisor routing if orchestrator fails
+            }
+        }
+
         long startTime = System.currentTimeMillis();
         String lower = query.toLowerCase().trim();
         AgentChatResponse response;

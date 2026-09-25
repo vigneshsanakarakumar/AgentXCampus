@@ -55,17 +55,30 @@ Higher education institutions suffer from fragmented, disconnected legacy portal
 
 ---
 
-## 4. Multi-Agent Architecture
+## 4. Autonomous Multi-Agent Architecture & Orchestrator Lifecycle
+
+AgentX Campus features an **Autonomous Agent Orchestrator** executing an iterative lifecycle:
+$$\text{THINK} \longrightarrow \text{PLAN} \longrightarrow \text{EXECUTE} \longrightarrow \text{VERIFY} \longrightarrow \text{CORRECT} \longrightarrow \text{RESPOND}$$
+
+Each user interaction generates a formal **Execution Plan** persisted in `agent_execution_plans` and traced across `agent_execution_steps`:
+- **`taskId`**: Unique UUID tracking the plan from start to finish.
+- **`intent`**: Classified intent (`ATTENDANCE_RECOVERY`, `LEAVE_OD_HISTORY`, `LEAVE_ATTENDANCE_IMPACT`, `INSTITUTIONAL_REGULATION_RAG`, `EXAM_PREPARATION`, etc.).
+- **`steps`**: Atomic steps containing `{step, agent, tool, status, executionTimeMs}` with lifecycle states `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`, `RETRYING`.
+- **`verification`**: Deterministic rule-based verification ensuring mathematically sound outputs with zero hallucinations.
 
 | Agent Name | Primary Responsibility | Backing Tools & Services |
 |------------|------------------------|--------------------------|
-| **Supervisor Agent** | Intent classification, agent selection, execution logging, audit trail | `AgentTaskLogRepository`, `AiConversationRepository` |
-| **Academic Eligibility Engine** | Hybrid evaluation of exam eligibility against live student metrics & statutory rules | `AttendanceRecordRepo`, `ExamScheduleRepo`, `ODRequestRepo`, `RagService` |
+| **Agent Orchestrator** | Central coordinator managing plan synthesis, step dispatch, deterministic verification, and transaction auditing | `AgentExecutionPlanRepository`, `AgentExecutionStepRepository`, `AuditLogRepository` |
+| **Supervisor Agent** | Front-facing gateway routing incoming queries to the `AgentOrchestrator` | `CampusToolRegistry`, `AiConversationRepository` |
+| **Attendance Agent** | Attendance analysis, attendance status querying, and recovery guidance | `AttendanceRecoveryEngine`, `AttendanceRecordRepository` |
+| **Attendance Recovery Engine** | Pure mathematical recovery calculator ($x = \max(0, \lceil 3T - 4A \rceil)$), upcoming session resolution, and schedule conflict check | `AttendanceRecordRepository`, `TimetableEntryRepository`, `ConflictEngine` |
+| **Leave / OD Agent** | Leave/OD request history, status lookup, and attendance impact analysis | `RequestService`, `LeaveRequestRepository`, `ODRequestRepository` |
+| **Academic Agent** | Profile resolution, course enrolment, faculty mentor lookup, and timetable access | `StudentProfileRepository`, `TimetableEntryRepository` |
 | **Document/RAG Agent** | Semantic handbook retrieval, passage quotation, exact paragraph citations | `RagService`, Subword Dense Vector Index |
 | **Examination Agent** | Autonomous exam scheduling clash verification (rooms, sections, regular slots) | `ConflictEngine`, `ExamScheduleRepository` |
 | **Schedule Agent** | Daily/weekly timetable resolution, facility occupancies, event calendars | `TimetableEntryRepository`, `CampusResourceRepository` |
 | **Grievance Agent** | Natural language complaint parsing, urgency classification, mentor routing | `GrievanceRepository`, `NotificationAgent` |
-| **Task Planning Agent** | Automated study task generation from assignments and syllabus milestones | `AssignmentRepository`, `StudentTaskRepository` |
+| **Opportunity Agent** | Internship, hackathon, and scholarship matching based on department & year | `OpportunityRepository`, `StudentProfileRepository` |
 | **Proactive AI Agent** | Background audit of attendance risks and dispatch of early warnings | `StudentProfileRepo`, `AttendanceRecordRepo`, `NotificationAgent` |
 | **Notification Agent** | Contextual notifications with explainability metadata (`matched_because`) | `NotificationRepository`, Server-Sent Events (SSE) |
 
@@ -215,33 +228,40 @@ npm run dev
 
 ---
 
-## 13. Verified Example Workflows (Demos 1 – 5)
+## 13. Verified Demo Scenarios (Scenarios 1 – 5)
 
-All 5 workflows are verified end-to-end via automated tests:
+All 5 core workflows execute through `AgentOrchestrator` with step-by-step decomposed tasks and deterministic verification:
 
-### DEMO 1 — Institutional Policy RAG with Exact Citation
-- **User Prompt**: *"What is the condonation fee if my attendance is 68%?"*
-- **Execution**: Orchestrator → Query Classifier → Semantic Vector Search → Condonation Rule.
-- **Output**: Explains 65%–74% condonation window, ₹750 per course fee, 3-working-day medical deadline, with exact citation:
-  `📌 Source: Autonomous Academic Regulations 2026, Section 1: Attendance Requirements & Condonation (Page 1, Para 2)`
+### DEMO 1 — Deterministic Attendance Recovery
+- **User Prompt**: *"My attendance is 68%. Help me fix it."*
+- **Execution Plan**:
+  1. `ATTENDANCE_AGENT.GET_ATTENDANCE` (retrieves current record: 27 attended / 40 total = 67.5%)
+  2. `ACADEMIC_AGENT.GET_UPCOMING_CLASSES` (fetches upcoming timetable sessions)
+  3. `ATTENDANCE_AGENT.CALCULATE_RECOVERY` ($x = \max(0, \lceil 3(40) - 4(27) \rceil) = 12$ consecutive classes)
+  4. `CONFLICT_AGENT.CHECK_CONFLICTS` (verifies schedule conflict clearance)
+  5. `VERIFICATION_AGENT.VERIFY_CALCULATIONS` (verifies $(27+12)/(40+12) = 39/52 = 75.0\% \ge 75\%$)
+- **Output**: Pure deterministic recovery plan, exact count of 12 classes required, scheduled upcoming sessions, and verified badge.
 
-### DEMO 2 — Agentic Hybrid DB + RAG Reasoning (Exam Eligibility)
-- **User Prompt**: *"Am I eligible for tomorrow's exam?"*
-- **Execution**: Orchestrator → Query Classifier → Database Lookup (student's DBMS attendance: 90.0%, scheduled exam: tomorrow 10:00 AM) → RAG Regulation Lookup → Rule Engine Threshold Check (≥75% Direct).
-- **Output**: Deterministic verdict: **ELIGIBLE (DIRECT)**, hall ticket issued, citing statutory attendance clause.
+### DEMO 2 — Leave & OD Request History
+- **User Prompt**: *"I took leave on September 10 and September 17. Show my leave history."*
+- **Execution Plan**: `LEAVE_OD_AGENT.GET_STUDENT_LEAVE_HISTORY` $\to$ `VERIFICATION_AGENT.VERIFY_RECORDS`.
+- **Output**: Chronological leave history with date ranges, leave types, status (`APPROVED`/`PENDING`), total days, and mentor notes.
 
-### DEMO 3 — Campus Grievance Incident Dispatch
-- **User Prompt**: *"The projector in Room 302 is broken and showing green lines"*
-- **Execution**: Orchestrator → Grievance Agent → Metadata Extraction (Category: `MAINTENANCE`, Urgency: `MEDIUM`) → Auto-routing to Section Mentor → Ticket creation `#GRV-XXXX` → Live Mentor Notification.
+### DEMO 3 — Approved Leave Attendance Impact Analysis
+- **User Prompt**: *"How will my approved leave affect my attendance?"*
+- **Execution Plan**: `LEAVE_OD_AGENT.GET_APPROVED_LEAVES` $\to$ `ATTENDANCE_AGENT.SIMULATE_LEAVE_IMPACT` $\to$ `VERIFICATION_AGENT.VERIFY_SIMULATION`.
+- **Output**: Visualized percentage delta showing current attendance vs projected impact after missed periods.
 
-### DEMO 4 — Conflict Detection Engine
-- **Admin Prompt**: *"Schedule DBMS exam at 10 AM in Room 302"*
-- **Execution**: Orchestrator → Examination Agent → Candidate Generation → Conflict Engine (Checks exam room collisions, section exam collisions, regular timetable collisions).
-- **Output**: Immediate conflict report with clash details, severity, and scheduling recommendations.
+### DEMO 4 — Institutional Regulation RAG with Exact Citation
+- **User Prompt**: *"What is the minimum attendance requirement?"*
+- **Execution Plan**: `DOCUMENT_RAG_AGENT.RETRIEVAL` $\to$ `VERIFICATION_AGENT.VERIFY_CITATION`.
+- **Output**: "The minimum attendance requirement is 75%... Condonation between 65%–74% is subject to Principal approval."
+  `📌 Source: Autonomous Academic Regulations 2026, Section 1: Attendance Requirements & Condonation (Page 14)`
 
-### DEMO 5 — Proactive AI Attendance Risk Audit
-- **Autonomous Trigger**: Periodic or Admin `/api/v1/agent/proactive/run-audit`.
-- **Execution**: Scans all active student attendance records → Identifies students <75% → Verifies condonation vs detention policy floors via RAG → Dispatches explainable notifications with `matched_because` tags.
+### DEMO 5 — Proactive Exam Preparation
+- **User Prompt**: *"Prepare me for my upcoming exam."*
+- **Execution Plan**: `EXAMINATION_AGENT.GET_SCHEDULED_EXAMS` $\to$ `ACADEMIC_AGENT.GET_ATTENDANCE` $\to$ `DOCUMENT_RAG_AGENT.RETRIEVAL` $\to$ `VERIFICATION_AGENT.VERIFY_READINESS`.
+- **Output**: Complete exam readiness breakdown with scheduled exam dates, rooms, attendance eligibility clearance, and revision strategy.
 
 ---
 
@@ -251,12 +271,15 @@ The repository includes a comprehensive JUnit 5 test suite (`backend/src/test/ja
 
 | Test Suite | Purpose | Tests Run | Result |
 |------------|---------|-----------|--------|
-| `ConflictEngineTest` | Room collision, section clash, timetable overlap verification | 3 | **PASS (100%)** |
+| `AgentOrchestratorExecutionTest` | Verifies orchestrator lifecycle, task decomposition, and demo scenario plans | 4 | **PASS (100%)** |
+| `AttendanceRecoveryAndLeaveWorkflowTest` | Pure recovery math ($3T - 4A$), leave overlap check, date validation, idempotency | 7 | **PASS (100%)** |
 | `AcademicEligibilityEngineTest` | Hybrid DB + RAG exam eligibility rules (≥75%, 68%, <65%) | 3 | **PASS (100%)** |
+| `ConflictEngineTest` | Room collision, section clash, timetable overlap verification | 3 | **PASS (100%)** |
+| `RagFlowClientTest` | RAGFlow v0.16.0 API client connectivity, dataset retrieval, and error resilience | 4 | **PASS (100%)** |
 | `RagServiceTest` | 256-dim embeddings, L2 normalization, retrieval, self-correction | 4 | **PASS (100%)** |
 | `SecurityAccessTest` | RBAC enforcement and object-level task ownership protection | 2 | **PASS (100%)** |
 | `RagEvaluationTest` | Benchmark evaluation across institutional queries | 1 | **PASS (100%)** |
-| **Total** | | **13** | **PASS (100%)** |
+| **Total** | | **28** | **PASS (100%)** |
 
 ---
 
