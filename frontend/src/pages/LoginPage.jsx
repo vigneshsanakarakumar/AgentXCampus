@@ -157,65 +157,6 @@ export const LoginPage = () => {
               </Button>
             </form>
 
-            <div className="pt-3 border-t border-[var(--color-border)] space-y-2">
-              <span className="text-[11px] font-semibold text-[var(--color-muted-foreground)] block text-center">
-                Demo Accounts (Click to Fill):
-              </span>
-              <div className="grid grid-cols-2 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIdentifier('hod.cse');
-                    setPassword('faculty123');
-                    setError('');
-                  }}
-                  className="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-purple-500/30 bg-purple-500/10 text-purple-700 dark:text-purple-300 hover:bg-purple-500/20 text-left transition-colors"
-                >
-                  <div className="font-bold">👔 HOD (CSE)</div>
-                  <div className="text-[9px] opacity-75 font-mono">hod.cse / faculty123</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIdentifier('priya.m');
-                    setPassword('faculty123');
-                    setError('');
-                  }}
-                  className="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-blue-500/30 bg-blue-500/10 text-blue-700 dark:text-blue-300 hover:bg-blue-500/20 text-left transition-colors"
-                >
-                  <div className="font-bold">👩‍🏫 Faculty Mentor</div>
-                  <div className="text-[9px] opacity-75 font-mono">priya.m / faculty123</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIdentifier('vasan');
-                    setPassword('student123');
-                    setError('');
-                  }}
-                  className="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/20 text-left transition-colors"
-                >
-                  <div className="font-bold">🎓 Student (Sec C)</div>
-                  <div className="text-[9px] opacity-75 font-mono">vasan / student123</div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIdentifier('admin');
-                    setPassword('admin');
-                    setError('');
-                  }}
-                  className="px-2.5 py-1.5 text-[11px] font-medium rounded-lg border border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300 hover:bg-red-500/20 text-left transition-colors"
-                >
-                  <div className="font-bold">🛡️ Administrator</div>
-                  <div className="text-[9px] opacity-75 font-mono">admin / admin</div>
-                </button>
-              </div>
-            </div>
-
             <p className="text-center text-xs text-[var(--color-muted-foreground)] pt-2 border-t border-[var(--color-border)]">
               Don't have an account?{' '}
               <Link to="/signup" className="font-semibold text-[var(--color-primary)] hover:underline">
