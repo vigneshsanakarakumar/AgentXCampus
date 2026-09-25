@@ -26,20 +26,27 @@ import {
   GraduationCap,
   Layers,
   ArrowRight,
-  Filter
+  Filter,
+  UserPlus,
+  Briefcase,
+  Mail,
+  Hash,
+  Check,
+  X
 } from 'lucide-react';
 
 export const HodPortal = () => {
   const { user } = useAuth();
   const { addToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'timetables' | 'faculty' | 'ai-ingestion'
+  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'timetables' | 'faculty' | 'ai-ingestion' | 'registrations'
   const [loading, setLoading] = useState(true);
   const [dashboard, setDashboard] = useState(null);
   const [facultyRoster, setFacultyRoster] = useState([]);
   const [classTimetables, setClassTimetables] = useState({});
   const [facultyTimetables, setFacultyTimetables] = useState([]);
   const [leaveRequests, setLeaveRequests] = useState([]);
+  const [registrationRequests, setRegistrationRequests] = useState([]);
 
   // Timetable view state
   const [timetableMode, setTimetableMode] = useState('class'); // 'class' | 'faculty'
@@ -57,6 +64,13 @@ export const HodPortal = () => {
   const [processingLeaveId, setProcessingLeaveId] = useState(null);
   const [resolutionNotes, setResolutionNotes] = useState('');
 
+  // Registration approvals state
+  const [regStatusFilter, setRegStatusFilter] = useState('ALL'); // 'ALL' | 'PENDING' | 'APPROVED' | 'REJECTED'
+  const [regRoleFilter, setRegRoleFilter] = useState('ALL'); // 'ALL' | 'STUDENT' | 'FACULTY'
+  const [processingRegId, setProcessingRegId] = useState(null);
+  const [rejectionTargetId, setRejectionTargetId] = useState(null);
+  const [rejectionReasonInput, setRejectionReasonInput] = useState('');
+
   useEffect(() => {
     fetchDashboardData();
   }, []);
@@ -64,12 +78,13 @@ export const HodPortal = () => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      const [dashRes, facultyRes, classTtRes, facTtRes, leavesRes] = await Promise.all([
+      const [dashRes, facultyRes, classTtRes, facTtRes, leavesRes, regRes] = await Promise.all([
         api.get('/hod/dashboard'),
         api.get('/hod/faculty'),
         api.get('/hod/timetables/classes'),
         api.get('/hod/timetables/faculty'),
-        api.get('/hod/faculty-leave-requests')
+        api.get('/hod/faculty-leave-requests'),
+        api.get('/hod/registrations')
       ]);
 
       setDashboard(dashRes.data);
@@ -77,6 +92,7 @@ export const HodPortal = () => {
       setClassTimetables(classTtRes.data);
       setFacultyTimetables(facTtRes.data);
       setLeaveRequests(leavesRes.data);
+      setRegistrationRequests(regRes.data || []);
 
       if (facultyRes.data && facultyRes.data.length > 0) {
         setSelectedFacultyId(String(facultyRes.data[0].id));
@@ -106,6 +122,48 @@ export const HodPortal = () => {
       addToast('Failed to update leave status', 'error');
     } finally {
       setProcessingLeaveId(null);
+    }
+  };
+
+  const handleApproveRegistration = async (id) => {
+    setProcessingRegId(id);
+    try {
+      await api.post(`/hod/registrations/${id}/approve`);
+      addToast('Registration verified and approved! Account is now active.', 'success');
+      const [regRes, dashRes] = await Promise.all([
+        api.get('/hod/registrations'),
+        api.get('/hod/dashboard')
+      ]);
+      setRegistrationRequests(regRes.data || []);
+      setDashboard(dashRes.data);
+    } catch (err) {
+      console.error('Approval failed:', err);
+      addToast(err.response?.data?.message || 'Failed to approve registration', 'error');
+    } finally {
+      setProcessingRegId(null);
+    }
+  };
+
+  const handleRejectRegistration = async (id) => {
+    setProcessingRegId(id);
+    try {
+      await api.post(`/hod/registrations/${id}/reject`, {
+        reason: rejectionReasonInput || 'Rejected by Department Head of Department.'
+      });
+      addToast('Registration request has been rejected.', 'info');
+      setRejectionTargetId(null);
+      setRejectionReasonInput('');
+      const [regRes, dashRes] = await Promise.all([
+        api.get('/hod/registrations'),
+        api.get('/hod/dashboard')
+      ]);
+      setRegistrationRequests(regRes.data || []);
+      setDashboard(dashRes.data);
+    } catch (err) {
+      console.error('Rejection failed:', err);
+      addToast(err.response?.data?.message || 'Failed to reject registration', 'error');
+    } finally {
+      setProcessingRegId(null);
     }
   };
 
@@ -150,6 +208,15 @@ export const HodPortal = () => {
 
   const pendingLeaves = leaveRequests.filter(l => l.status === 'PENDING');
   const resolvedLeaves = leaveRequests.filter(l => l.status !== 'PENDING');
+
+  const pendingRegistrations = registrationRequests.filter(r => r.status === 'PENDING');
+  const pendingRegistrationsCount = dashboard?.pendingRegistrationsCount ?? pendingRegistrations.length;
+
+  const filteredRegistrations = registrationRequests.filter((r) => {
+    const matchesStatus = regStatusFilter === 'ALL' ? true : r.status === regStatusFilter;
+    const matchesRole = regRoleFilter === 'ALL' ? true : r.role === regRoleFilter;
+    return matchesStatus && matchesRole;
+  });
 
   // Filtered timetable data
   const currentClassEntries = (classTimetables && classTimetables[selectedSection]) || [];
@@ -207,7 +274,7 @@ export const HodPortal = () => {
             </div>
 
             {/* Quick KPI stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 shrink-0">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
               <div className="p-3.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] shadow-xs">
                 <div className="text-xs text-[var(--color-muted-foreground)] flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-blue-500" /> Faculty
@@ -241,6 +308,19 @@ export const HodPortal = () => {
                 </div>
                 <div className="text-xl font-bold text-amber-600 dark:text-amber-400 mt-1">
                   {pendingLeaves.length}
+                </div>
+              </div>
+
+              <div
+                onClick={() => setActiveTab('registrations')}
+                className="p-3.5 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] shadow-xs cursor-pointer hover:border-emerald-500/60 transition-all col-span-2 sm:col-span-1"
+              >
+                <div className="text-xs text-[var(--color-muted-foreground)] flex items-center gap-1.5">
+                  <UserPlus className="w-3.5 h-3.5 text-emerald-500" /> Registrations
+                </div>
+                <div className="text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1 flex items-baseline gap-1">
+                  {pendingRegistrationsCount}
+                  <span className="text-[10px] font-normal text-[var(--color-muted-foreground)]">pending</span>
                 </div>
               </div>
             </div>
@@ -300,6 +380,23 @@ export const HodPortal = () => {
           >
             <Sparkles className="w-4 h-4 text-purple-500" />
             AI Document Ingestion & Targeted Dispatcher
+          </button>
+
+          <button
+            onClick={() => setActiveTab('registrations')}
+            className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === 'registrations'
+                ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
+                : 'border-transparent text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]'
+            }`}
+          >
+            <UserPlus className="w-4 h-4 text-emerald-500" />
+            Registrations & Approvals
+            {pendingRegistrationsCount > 0 && (
+              <span className="px-1.5 py-0.5 text-[10px] font-bold rounded-full bg-emerald-600 text-white animate-pulse">
+                {pendingRegistrationsCount}
+              </span>
+            )}
           </button>
         </div>
 
@@ -926,6 +1023,331 @@ export const HodPortal = () => {
                 </Card>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* TAB 5: REGISTRATIONS & APPROVALS */}
+        {activeTab === 'registrations' && (
+          <div className="space-y-6">
+            {/* Header and Filter Bar */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)]">
+              <div>
+                <h3 className="font-bold text-base text-[var(--color-foreground)] flex items-center gap-2">
+                  <UserPlus className="w-5 h-5 text-emerald-500" />
+                  Department Registration Requests & Account Approvals
+                </h3>
+                <p className="text-xs text-[var(--color-muted-foreground)] mt-0.5">
+                  Verify academic credentials, student roll numbers & sections, or faculty designations before approving account access.
+                </p>
+              </div>
+
+              {/* Status & Role Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex p-1 rounded-lg bg-[var(--color-muted)]/50 border border-[var(--color-border)] text-xs">
+                  {['ALL', 'PENDING', 'APPROVED', 'REJECTED'].map((st) => (
+                    <button
+                      key={st}
+                      onClick={() => setRegStatusFilter(st)}
+                      className={`px-3 py-1 rounded-md font-semibold transition-all ${
+                        regStatusFilter === st
+                          ? 'bg-[var(--color-card)] text-[var(--color-foreground)] shadow-xs'
+                          : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]'
+                      }`}
+                    >
+                      {st === 'ALL'
+                        ? 'All'
+                        : st === 'PENDING'
+                        ? `Pending (${pendingRegistrations.length})`
+                        : st.charAt(0) + st.slice(1).toLowerCase()}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="inline-flex p-1 rounded-lg bg-[var(--color-muted)]/50 border border-[var(--color-border)] text-xs">
+                  {['ALL', 'STUDENT', 'FACULTY'].map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setRegRoleFilter(r)}
+                      className={`px-3 py-1 rounded-md font-semibold transition-all ${
+                        regRoleFilter === r
+                          ? 'bg-[var(--color-primary)] text-white shadow-xs'
+                          : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]'
+                      }`}
+                    >
+                      {r === 'ALL' ? 'All Roles' : r === 'STUDENT' ? 'Students' : 'Faculty'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* List of Applications */}
+            {filteredRegistrations.length === 0 ? (
+              <Card>
+                <CardBody className="text-center py-12 space-y-3">
+                  <UserCheck className="w-12 h-12 text-[var(--color-muted-foreground)] mx-auto opacity-50" />
+                  <h4 className="font-bold text-base text-[var(--color-foreground)]">
+                    No Registration Requests Found
+                  </h4>
+                  <p className="text-xs text-[var(--color-muted-foreground)] max-w-sm mx-auto">
+                    {regStatusFilter === 'PENDING'
+                      ? 'All submitted student and faculty registrations for your department have been reviewed and processed.'
+                      : 'No registration requests match the selected status or role filter.'}
+                  </p>
+                </CardBody>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 gap-4">
+                {filteredRegistrations.map((req) => {
+                  const isStudent = req.role === 'STUDENT';
+                  const isPending = req.status === 'PENDING';
+                  const isApproved = req.status === 'APPROVED';
+                  const isRejected = req.status === 'REJECTED';
+                  const isProcessing = processingRegId === req.id;
+                  const isRejectingThis = rejectionTargetId === req.id;
+
+                  return (
+                    <Card
+                      key={req.id}
+                      className={`border transition-all ${
+                        isPending
+                          ? 'border-amber-300 dark:border-amber-900/60 shadow-xs'
+                          : isApproved
+                          ? 'border-emerald-300 dark:border-emerald-900/40'
+                          : 'border-red-200 dark:border-red-900/40 opacity-80'
+                      }`}
+                    >
+                      <CardBody className="p-5 space-y-4">
+                        {/* Top Row: Role, Name, Submission Date, and Status Badge */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--color-border)]/60">
+                          <div className="flex items-center gap-3">
+                            <span
+                              className={`p-2.5 rounded-xl ${
+                                isStudent
+                                  ? 'bg-blue-100 dark:bg-blue-950/60 text-blue-600 dark:text-blue-400'
+                                  : 'bg-purple-100 dark:bg-purple-950/60 text-purple-600 dark:text-purple-400'
+                              }`}
+                            >
+                              {isStudent ? (
+                                <GraduationCap className="w-5 h-5" />
+                              ) : (
+                                <Briefcase className="w-5 h-5" />
+                              )}
+                            </span>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-bold text-base text-[var(--color-foreground)]">
+                                  {req.applicantName || `${req.firstName} ${req.lastName}`}
+                                </h4>
+                                <span className="text-xs font-mono text-[var(--color-muted-foreground)]">
+                                  (@{req.username})
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 text-xs text-[var(--color-muted-foreground)] mt-0.5">
+                                <span className="flex items-center gap-1">
+                                  <Mail className="w-3.5 h-3.5" />
+                                  {req.email}
+                                </span>
+                                <span>•</span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  Applied {req.createdAt ? new Date(req.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Recently'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 self-start sm:self-center">
+                            <span
+                              className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider inline-flex items-center gap-1.5 ${
+                                isPending
+                                  ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-300 dark:border-amber-800'
+                                  : isApproved
+                                  ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800'
+                                  : 'bg-red-100 dark:bg-red-950/60 text-red-700 dark:text-red-300 border border-red-300 dark:border-red-800'
+                              }`}
+                            >
+                              {isPending && <Clock className="w-3.5 h-3.5 animate-pulse" />}
+                              {isApproved && <CheckCircle2 className="w-3.5 h-3.5" />}
+                              {isRejected && <XCircle className="w-3.5 h-3.5" />}
+                              {req.status}
+                            </span>
+                            <span
+                              className={`px-2.5 py-0.5 rounded text-[11px] font-semibold ${
+                                isStudent
+                                  ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                                  : 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20'
+                              }`}
+                            >
+                              {isStudent ? 'Student' : 'Faculty'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Middle Row: Detailed Information for Verification */}
+                        <div className="p-3.5 rounded-xl bg-[var(--color-muted)]/20 border border-[var(--color-border)]/70">
+                          <span className="text-[11px] font-bold text-[var(--color-muted-foreground)] uppercase tracking-wider block mb-2">
+                            Credentials & Academic Placement Submitted by Applicant:
+                          </span>
+
+                          {isStudent ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                              <div className="p-2.5 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)]">
+                                <span className="text-[10px] text-[var(--color-muted-foreground)] block">
+                                  University Roll Number
+                                </span>
+                                <span className="font-mono font-bold text-sm text-blue-600 dark:text-blue-400">
+                                  {req.rollNumber || 'N/A'}
+                                </span>
+                              </div>
+
+                              <div className="p-2.5 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)]">
+                                <span className="text-[10px] text-[var(--color-muted-foreground)] block">
+                                  Assigned Section
+                                </span>
+                                <span className="font-bold text-sm text-[var(--color-foreground)]">
+                                  Section {req.section || 'A'}
+                                </span>
+                              </div>
+
+                              <div className="p-2.5 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)]">
+                                <span className="text-[10px] text-[var(--color-muted-foreground)] block">
+                                  Year / Semester
+                                </span>
+                                <span className="font-semibold text-sm text-[var(--color-foreground)]">
+                                  Year {req.year || 1} • Sem {req.semester || 1}
+                                </span>
+                              </div>
+
+                              <div className="p-2.5 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)]">
+                                <span className="text-[10px] text-[var(--color-muted-foreground)] block">
+                                  Target Department
+                                </span>
+                                <span className="font-semibold text-xs text-[var(--color-primary)] truncate block">
+                                  {req.department}
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                              <div className="p-2.5 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)]">
+                                <span className="text-[10px] text-[var(--color-muted-foreground)] block">
+                                  Designation / Title
+                                </span>
+                                <span className="font-bold text-sm text-purple-600 dark:text-purple-400">
+                                  {req.designation || 'Faculty Member'}
+                                </span>
+                              </div>
+
+                              <div className="p-2.5 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)]">
+                                <span className="text-[10px] text-[var(--color-muted-foreground)] block">
+                                  Cabin / Room Location
+                                </span>
+                                <span className="font-semibold text-sm text-[var(--color-foreground)]">
+                                  {req.cabinNumber || 'Staff Room'}
+                                </span>
+                              </div>
+
+                              <div className="p-2.5 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)]">
+                                <span className="text-[10px] text-[var(--color-muted-foreground)] block">
+                                  Specialization / Subject Taught
+                                </span>
+                                <span className="font-semibold text-xs text-[var(--color-foreground)] truncate block">
+                                  {req.specialization || 'Subject Staff (Not Class Tutor)'}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Rejection Note or Approval Status Details */}
+                        {isRejected && req.rejectionReason && (
+                          <div className="p-3 rounded-lg border border-red-300 dark:border-red-900 bg-red-50 dark:bg-red-950/40 text-xs text-red-700 dark:text-red-300">
+                            <strong>Rejection Reason:</strong> {req.rejectionReason}
+                          </div>
+                        )}
+
+                        {isApproved && (
+                          <div className="flex items-center gap-2 text-xs text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="w-4 h-4 shrink-0" />
+                            <span>
+                              Verified & Activated by HOD {req.hodName ? `(${req.hodName})` : ''} on{' '}
+                              {req.resolvedAt ? new Date(req.resolvedAt).toLocaleDateString() : 'earlier'}. Account is currently active.
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Bottom Action Row for Pending Items */}
+                        {isPending && (
+                          <div className="pt-2">
+                            {isRejectingThis ? (
+                              <div className="p-3.5 rounded-xl border border-red-300 dark:border-red-900/60 bg-red-50/50 dark:bg-red-950/20 space-y-3">
+                                <div className="text-xs font-semibold text-red-800 dark:text-red-300">
+                                  Specify Rejection Reason for {req.applicantName}:
+                                </div>
+                                <input
+                                  type="text"
+                                  placeholder="e.g. Invalid Roll Number, Section mismatch, or verification failed"
+                                  value={rejectionReasonInput}
+                                  onChange={(e) => setRejectionReasonInput(e.target.value)}
+                                  className="w-full text-xs p-2 rounded-lg border border-red-300 dark:border-red-900 bg-[var(--color-card)] text-[var(--color-foreground)]"
+                                  autoFocus
+                                />
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setRejectionTargetId(null);
+                                      setRejectionReasonInput('');
+                                    }}
+                                  >
+                                    Cancel
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="bg-red-600 hover:bg-red-700 text-white"
+                                    loading={isProcessing}
+                                    onClick={() => handleRejectRegistration(req.id)}
+                                  >
+                                    Confirm Rejection
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="flex items-center justify-end gap-3">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40"
+                                  disabled={isProcessing}
+                                  icon={XCircle}
+                                  onClick={() => {
+                                    setRejectionTargetId(req.id);
+                                    setRejectionReasonInput('');
+                                  }}
+                                >
+                                  Reject Request
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                                  loading={isProcessing}
+                                  icon={CheckCircle2}
+                                  onClick={() => handleApproveRegistration(req.id)}
+                                >
+                                  Verify & Approve Account
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </CardBody>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </main>

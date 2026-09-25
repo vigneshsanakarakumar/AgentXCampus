@@ -35,6 +35,7 @@ public class DataInitializer implements CommandLineRunner {
     private final NotificationRepository notificationRepository;
     private final HodProfileRepository hodProfileRepository;
     private final FacultyLeaveRequestRepository facultyLeaveRequestRepository;
+    private final UserRegistrationRequestRepository userRegistrationRequestRepository;
     private final PasswordEncoder passwordEncoder;
 
     public DataInitializer(
@@ -58,6 +59,7 @@ public class DataInitializer implements CommandLineRunner {
             NotificationRepository notificationRepository,
             HodProfileRepository hodProfileRepository,
             FacultyLeaveRequestRepository facultyLeaveRequestRepository,
+            UserRegistrationRequestRepository userRegistrationRequestRepository,
             PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.studentProfileRepository = studentProfileRepository;
@@ -79,6 +81,7 @@ public class DataInitializer implements CommandLineRunner {
         this.notificationRepository = notificationRepository;
         this.hodProfileRepository = hodProfileRepository;
         this.facultyLeaveRequestRepository = facultyLeaveRequestRepository;
+        this.userRegistrationRequestRepository = userRegistrationRequestRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -95,6 +98,7 @@ public class DataInitializer implements CommandLineRunner {
         seedEvents();
         seedStudentData();
         seedKnowledgeDocuments();
+        seedRegistrationRequests();
     }
 
     private void seedUsers() {
@@ -283,6 +287,29 @@ public class DataInitializer implements CommandLineRunner {
         fp4.setMentor(true);
         fp4.setAssignedSection("D");
         facultyProfileRepository.save(fp4);
+
+        // Subject Staff Faculty: Prof. S. Karthik (Mentor who is NOT a class tutor of any section, just subject staff)
+        User u5 = userRepository.findByUsername("karthik.s").orElseGet(() -> {
+            User u = new User("karthik.s", "karthik.s@campus.edu", passwordEncoder.encode("faculty123"), Role.FACULTY, "Prof. S.", "Karthik");
+            return userRepository.save(u);
+        });
+        FacultyProfile fp5 = facultyProfileRepository.findByUser(u5).orElseGet(() -> {
+            FacultyProfile fp = new FacultyProfile();
+            fp.setUser(u5);
+            fp.setEmployeeId("EMP-CSE-105");
+            fp.setDepartment("Computer Science & Engineering");
+            fp.setDesignation("Assistant Professor (Subject Staff)");
+            fp.setSpecialization("Cloud Computing & Discrete Mathematics");
+            fp.setAssignedDepartment("Computer Science & Engineering");
+            fp.setAssignedSection(null); // Not a tutor/mentor of any class section
+            fp.setMentor(false);
+            fp.setCabinNumber("Block A - Cabin 305");
+            return facultyProfileRepository.save(fp);
+        });
+        fp5.setMentor(false);
+        fp5.setAssignedSection(null);
+        fp5.setSpecialization("Cloud Computing & Discrete Mathematics");
+        facultyProfileRepository.save(fp5);
 
         // Prospective staff login request awaiting approval
         if (!staffLoginRequestRepository.existsByEmail("prof.sharma@campus.edu")) {
@@ -1308,5 +1335,85 @@ public class DataInitializer implements CommandLineRunner {
 
         campusDocumentRepository.saveAll(List.of(doc1, doc2, doc3, doc4, doc5, doc6, doc7));
         System.out.println("[DataInitializer] Seeded RAG knowledge base documents (7 statutory institutional documents with exact citations)");
+    }
+
+    private void seedRegistrationRequests() {
+        if (userRegistrationRequestRepository.count() == 0) {
+            User hodUser = userRepository.findByUsername("hod.cse").orElse(null);
+
+            // 1. Pending Student Registration: Anitha R (CSE Sec B, Roll: 717824P388)
+            User studentUser = userRepository.findByUsername("anitha.r").orElseGet(() -> {
+                User u = new User("anitha.r", "anitha.r@campus.edu", passwordEncoder.encode("student123"), Role.STUDENT, "Anitha", "R");
+                u.setActive(false); // Inactive until HOD approves
+                return userRepository.save(u);
+            });
+            if (studentProfileRepository.findByUser(studentUser).isEmpty()) {
+                StudentProfile sp = new StudentProfile();
+                sp.setUser(studentUser);
+                sp.setRollNumber("717824P388");
+                sp.setDepartment("Computer Science & Engineering");
+                sp.setSection("B");
+                sp.setYear(2);
+                sp.setSemester(4);
+                sp.setCgpa(8.4);
+                sp.setAttendanceRate(92);
+                studentProfileRepository.save(sp);
+            }
+
+            UserRegistrationRequest req1 = new UserRegistrationRequest();
+            req1.setUser(studentUser);
+            req1.setUsername("anitha.r");
+            req1.setEmail("anitha.r@campus.edu");
+            req1.setFirstName("Anitha");
+            req1.setLastName("R");
+            req1.setRole(Role.STUDENT);
+            req1.setDepartment("Computer Science & Engineering");
+            req1.setRollNumber("717824P388");
+            req1.setSection("B");
+            req1.setYear(2);
+            req1.setSemester(4);
+            req1.setStatus("PENDING");
+            req1.setHodUser(hodUser);
+            req1.setCreatedAt(LocalDateTime.now().minusHours(3));
+            userRegistrationRequestRepository.save(req1);
+
+            // 2. Pending Faculty Registration: Dr. P. Arun (Subject Staff in Computer Vision & Robotics)
+            User facultyUser = userRepository.findByUsername("arun.p").orElseGet(() -> {
+                User u = new User("arun.p", "arun.p@campus.edu", passwordEncoder.encode("faculty123"), Role.FACULTY, "Dr. P.", "Arun");
+                u.setActive(false); // Inactive until HOD approves
+                return userRepository.save(u);
+            });
+            if (facultyProfileRepository.findByUser(facultyUser).isEmpty()) {
+                FacultyProfile fp = new FacultyProfile();
+                fp.setUser(facultyUser);
+                fp.setEmployeeId("EMP-CSE-106");
+                fp.setDepartment("Computer Science & Engineering");
+                fp.setDesignation("Assistant Professor");
+                fp.setSpecialization("Computer Vision & Robotics");
+                fp.setAssignedDepartment("Computer Science & Engineering");
+                fp.setAssignedSection(null);
+                fp.setMentor(false);
+                fp.setCabinNumber("Block B - Cabin 210");
+                facultyProfileRepository.save(fp);
+            }
+
+            UserRegistrationRequest req2 = new UserRegistrationRequest();
+            req2.setUser(facultyUser);
+            req2.setUsername("arun.p");
+            req2.setEmail("arun.p@campus.edu");
+            req2.setFirstName("Dr. P.");
+            req2.setLastName("Arun");
+            req2.setRole(Role.FACULTY);
+            req2.setDepartment("Computer Science & Engineering");
+            req2.setDesignation("Assistant Professor");
+            req2.setSpecialization("Computer Vision & Robotics");
+            req2.setCabinNumber("Block B - Cabin 210");
+            req2.setStatus("PENDING");
+            req2.setHodUser(hodUser);
+            req2.setCreatedAt(LocalDateTime.now().minusHours(1));
+            userRegistrationRequestRepository.save(req2);
+
+            System.out.println("[DataInitializer] Seeded 2 pending registration requests for HOD approval (anitha.r as Student, arun.p as Faculty)");
+        }
     }
 }

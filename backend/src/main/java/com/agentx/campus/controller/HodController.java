@@ -102,4 +102,34 @@ public class HodController {
             return ResponseEntity.badRequest().body(Map.of("success", false, "error", ex.getMessage()));
         }
     }
+
+    @GetMapping("/registrations")
+    @Operation(summary = "Get student and faculty registration requests pending HOD approval")
+    public ResponseEntity<?> getRegistrations(Authentication authentication,
+                                             @RequestParam(required = false) String status) {
+        return ResponseEntity.ok(hodService.getDepartmentRegistrations(authentication.getName(), status));
+    }
+
+    @PostMapping("/registrations/{id}/approve")
+    @Operation(summary = "Approve student or faculty registration request and activate account")
+    public ResponseEntity<?> approveRegistration(Authentication authentication, @PathVariable Long id) {
+        try {
+            return ResponseEntity.ok(hodService.approveRegistration(id, authentication.getName()));
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
+    @PostMapping("/registrations/{id}/reject")
+    @Operation(summary = "Reject student or faculty registration request")
+    public ResponseEntity<?> rejectRegistration(Authentication authentication,
+                                                @PathVariable Long id,
+                                                @RequestBody(required = false) Map<String, String> body) {
+        try {
+            String reason = body != null ? body.get("reason") : null;
+            return ResponseEntity.ok(hodService.rejectRegistration(id, reason, authentication.getName()));
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
 }

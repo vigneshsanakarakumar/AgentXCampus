@@ -7,7 +7,20 @@ import Input from '../components/ui/Input';
 import PasswordInput from '../components/ui/PasswordInput';
 import Button from '../components/ui/Button';
 import Card, { CardBody } from '../components/ui/Card';
-import { UserPlus, Check, X, GraduationCap, Building2, Briefcase, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import {
+  UserPlus,
+  Check,
+  X,
+  GraduationCap,
+  Building2,
+  Briefcase,
+  CheckCircle2,
+  Clock,
+  BookOpen,
+  ArrowRight,
+  ShieldCheck,
+  Info
+} from 'lucide-react';
 
 const DEPARTMENTS = [
   'Computer Science & Engineering',
@@ -23,16 +36,25 @@ const DESIGNATIONS = [
   'Assistant Professor',
   'Associate Professor',
   'Professor',
-  'Head of Department (HOD)',
-  'Lab Instructor',
-  'Visiting Faculty'
+  'Assistant Professor (Subject Staff)',
+  'Subject Staff / Lecturer',
+  'Visiting Faculty',
+  'Lab Instructor'
 ];
 
 const SECTIONS = ['A', 'B', 'C', 'D'];
+const YEARS = [
+  { value: 1, label: '1st Year' },
+  { value: 2, label: '2nd Year' },
+  { value: 3, label: '3rd Year' },
+  { value: 4, label: '4th Year' }
+];
 
 export const SignupPage = () => {
-  const [mode, setMode] = useState('STUDENT'); // 'STUDENT' | 'STAFF'
+  // Role selection: 'STUDENT' or 'FACULTY'
+  const [role, setRole] = useState('STUDENT');
 
+  // Unified form data
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -41,44 +63,44 @@ export const SignupPage = () => {
     password: '',
     confirmPassword: '',
     department: 'Computer Science & Engineering',
-    section: 'A',
+    // Student specific
     rollNumber: '',
-  });
-
-  const [staffData, setStaffData] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    department: 'Computer Science & Engineering',
+    section: 'A',
+    year: 1,
+    semester: 1,
+    // Faculty specific
     designation: 'Assistant Professor',
-    notes: '',
+    specialization: '',
+    cabinNumber: ''
   });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [staffSubmitted, setStaffSubmitted] = useState(false);
+  const [submittedData, setSubmittedData] = useState(null);
 
-  const { signup } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError('');
-  };
-
-  const handleStaffChange = (e) => {
-    setStaffData({ ...staffData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
     setError('');
   };
 
   const isPasswordValid = formData.password.length >= 6;
   const isMatch = formData.password && formData.password === formData.confirmPassword;
 
-  const handleSignup = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.rollNumber.trim()) {
-      setError('Student Roll Number is required.');
+    setError('');
+
+    // Common validations
+    if (!formData.firstName.trim() || !formData.lastName.trim()) {
+      setError('Please provide your full first and last name.');
+      return;
+    }
+    if (!formData.username.trim() || !formData.email.trim()) {
+      setError('Please provide a unique username and institutional email.');
       return;
     }
     if (!isPasswordValid) {
@@ -90,19 +112,55 @@ export const SignupPage = () => {
       return;
     }
 
+    // Role-specific validations
+    if (role === 'STUDENT') {
+      if (!formData.rollNumber.trim()) {
+        setError('University Roll Number is required for student registration.');
+        return;
+      }
+    } else if (role === 'FACULTY') {
+      if (!formData.designation) {
+        setError('Please select your academic faculty designation.');
+        return;
+      }
+    }
+
     setLoading(true);
-    setError('');
 
     try {
-      await signup({
-        ...formData,
-        rollNumber: formData.rollNumber.trim().toUpperCase(),
-        section: formData.section.trim().toUpperCase(),
-      });
-      addToast('Student account registered successfully! Please sign in.', 'success');
-      navigate('/login');
+      const payload = {
+        role,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        username: formData.username.trim().toLowerCase(),
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+        confirmPassword: formData.confirmPassword,
+        department: formData.department,
+        ...(role === 'STUDENT'
+          ? {
+              rollNumber: formData.rollNumber.trim().toUpperCase(),
+              section: formData.section.trim().toUpperCase(),
+              year: Number(formData.year) || 1,
+              semester: Number(formData.semester) || 1
+            }
+          : {
+              designation: formData.designation,
+              specialization: formData.specialization?.trim() || 'General Subject Faculty',
+              cabinNumber: formData.cabinNumber?.trim() || 'Staff Room'
+            })
+      };
+
+      const response = await api.post('/auth/register-request', payload);
+      setSubmittedData({ ...payload, ...response.data });
+      addToast(
+        `Registration submitted! Awaiting ${formData.department} HOD verification and approval.`,
+        'success'
+      );
     } catch (err) {
-      const msg = err.response?.data?.message || 'Unable to register student account. Please verify your details.';
+      const msg =
+        err.response?.data?.message ||
+        'Unable to submit registration request. Please verify your details.';
       setError(msg);
       addToast(msg, 'error');
     } finally {
@@ -110,74 +168,86 @@ export const SignupPage = () => {
     }
   };
 
-  const handleStaffRequest = async (e) => {
-    e.preventDefault();
-    if (!staffData.firstName.trim() || !staffData.lastName.trim() || !staffData.email.trim()) {
-      setError('Please provide your name and institutional email.');
-      return;
-    }
-
-    setLoading(true);
+  const handleReset = () => {
+    setSubmittedData(null);
+    setFormData({
+      firstName: '',
+      lastName: '',
+      username: '',
+      email: '',
+      password: '',
+      confirmPassword: '',
+      department: 'Computer Science & Engineering',
+      rollNumber: '',
+      section: 'A',
+      year: 1,
+      semester: 1,
+      designation: 'Assistant Professor',
+      specialization: '',
+      cabinNumber: ''
+    });
     setError('');
-
-    try {
-      await api.post('/auth/staff-request', staffData);
-      setStaffSubmitted(true);
-      addToast('Faculty access request submitted for admin review.', 'success');
-    } catch (err) {
-      const msg = err.response?.data?.message || 'Failed to submit faculty access request. Please try again.';
-      setError(msg);
-      addToast(msg, 'error');
-    } finally {
-      setLoading(false);
-    }
   };
 
   return (
     <div className="min-h-screen bg-[var(--color-background)] flex flex-col justify-center py-12 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md text-center">
+      <div className="sm:mx-auto sm:w-full sm:max-w-xl text-center">
         <Link to="/" className="inline-flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-[var(--color-primary)] flex items-center justify-center text-white font-bold text-base shadow-sm">
+          <div className="w-10 h-10 rounded-xl bg-[var(--color-primary)] flex items-center justify-center text-white font-bold text-lg shadow-sm">
             AX
           </div>
-          <span className="font-bold text-xl text-[var(--color-foreground)] tracking-tight">
+          <span className="font-bold text-2xl text-[var(--color-foreground)] tracking-tight">
             AgentX <span className="text-[var(--color-primary)]">Campus</span>
           </span>
         </Link>
-        <h2 className="mt-6 text-2xl font-bold tracking-tight text-[var(--color-foreground)]">
-          {mode === 'STUDENT' ? 'Student Registration' : 'Faculty Access Request'}
+        <h2 className="mt-5 text-2xl font-bold tracking-tight text-[var(--color-foreground)]">
+          {submittedData
+            ? 'Registration Submitted'
+            : role === 'STUDENT'
+            ? 'Student Account Registration'
+            : 'Faculty Account Registration'}
         </h2>
-        <p className="mt-1.5 text-xs text-[var(--color-muted-foreground)]">
-          {mode === 'STUDENT'
-            ? 'Register with your academic department, section, and roll number'
-            : 'Submit a faculty access request. Account activation requires administrative approval.'}
+        <p className="mt-1 text-xs text-[var(--color-muted-foreground)]">
+          {submittedData
+            ? 'Your application has been routed to your Department Head of Department (HOD) for review.'
+            : 'All registrations are verified and approved by the respective Department HOD before activation.'}
         </p>
 
-        {/* Mode Selector Tabs */}
-        <div className="mt-5 inline-flex p-1 rounded-xl bg-[var(--color-muted)]/50 border border-[var(--color-border)] shadow-xs">
-          <button
-            type="button"
-            onClick={() => { setMode('STUDENT'); setError(''); }}
-            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              mode === 'STUDENT'
-                ? 'bg-[var(--color-card)] text-[var(--color-foreground)] shadow-xs'
-                : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]'
-            }`}
-          >
-            Student Registration
-          </button>
-          <button
-            type="button"
-            onClick={() => { setMode('STAFF'); setError(''); }}
-            className={`px-4 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-              mode === 'STAFF'
-                ? 'bg-[var(--color-card)] text-[var(--color-foreground)] shadow-xs'
-                : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]'
-            }`}
-          >
-            Faculty Access Request
-          </button>
-        </div>
+        {/* 2-Option Selector Toggle */}
+        {!submittedData && (
+          <div className="mt-5 inline-flex p-1 rounded-xl bg-[var(--color-muted)]/50 border border-[var(--color-border)] shadow-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setRole('STUDENT');
+                setError('');
+              }}
+              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                role === 'STUDENT'
+                  ? 'bg-[var(--color-card)] text-[var(--color-foreground)] shadow-xs border border-[var(--color-border)]'
+                  : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]'
+              }`}
+            >
+              <GraduationCap className="w-4 h-4 text-[var(--color-primary)]" />
+              Register as Student
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setRole('FACULTY');
+                setError('');
+              }}
+              className={`flex items-center gap-2 px-5 py-2 rounded-lg text-xs font-semibold transition-all ${
+                role === 'FACULTY'
+                  ? 'bg-[var(--color-card)] text-[var(--color-foreground)] shadow-xs border border-[var(--color-border)]'
+                  : 'text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)]'
+              }`}
+            >
+              <Briefcase className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              Register as Faculty
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="mt-6 sm:mx-auto sm:w-full sm:max-w-xl px-4 sm:px-0">
@@ -189,13 +259,135 @@ export const SignupPage = () => {
               </div>
             )}
 
-            {mode === 'STUDENT' ? (
-              <form onSubmit={handleSignup} className="space-y-4">
+            {/* WAITING / CONFIRMATION SCREEN */}
+            {submittedData ? (
+              <div className="text-center py-4 space-y-5">
+                <div className="w-16 h-16 bg-amber-100 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 rounded-full flex items-center justify-center mx-auto ring-8 ring-amber-50 dark:ring-amber-950/20">
+                  <Clock className="w-9 h-9 animate-pulse" />
+                </div>
+
+                <div className="space-y-1">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/20">
+                    <Clock className="w-3.5 h-3.5" />
+                    STATUS: PENDING HOD APPROVAL
+                  </div>
+                  <h3 className="text-xl font-bold text-[var(--color-foreground)] mt-2">
+                    Application Sent to Department HOD
+                  </h3>
+                  <p className="text-xs text-[var(--color-muted-foreground)] max-w-md mx-auto leading-relaxed">
+                    Thank you, <span className="font-semibold text-[var(--color-foreground)]">{submittedData.firstName} {submittedData.lastName}</span>! Your registration request as a <span className="font-semibold text-[var(--color-foreground)]">{submittedData.role === 'STUDENT' ? 'Student' : 'Faculty Member'}</span> has been successfully sent to the Head of Department for review.
+                  </p>
+                </div>
+
+                {/* Submitted Details Review Card */}
+                <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-muted)]/20 text-left text-xs space-y-2.5">
+                  <div className="flex items-center justify-between pb-2 border-b border-[var(--color-border)]/60">
+                    <span className="font-bold text-[var(--color-foreground)] flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                      Submitted Application Details
+                    </span>
+                    <span className="text-[11px] font-mono text-[var(--color-muted-foreground)]">
+                      Ref #{submittedData.requestId || 'REQ-NEW'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-[var(--color-muted-foreground)] block">Username:</span>
+                      <span className="font-semibold text-[var(--color-foreground)]">@{submittedData.username}</span>
+                    </div>
+                    <div>
+                      <span className="text-[var(--color-muted-foreground)] block">Official Email:</span>
+                      <span className="font-semibold text-[var(--color-foreground)]">{submittedData.email}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-[var(--color-muted-foreground)] block">Academic Department:</span>
+                      <span className="font-semibold text-[var(--color-primary)]">{submittedData.department}</span>
+                    </div>
+
+                    {submittedData.role === 'STUDENT' ? (
+                      <>
+                        <div>
+                          <span className="text-[var(--color-muted-foreground)] block">Roll Number:</span>
+                          <span className="font-bold text-blue-600 dark:text-blue-400">{submittedData.rollNumber}</span>
+                        </div>
+                        <div>
+                          <span className="text-[var(--color-muted-foreground)] block">Section & Year:</span>
+                          <span className="font-semibold text-[var(--color-foreground)]">
+                            Section {submittedData.section} (Year {submittedData.year}, Sem {submittedData.semester})
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div>
+                          <span className="text-[var(--color-muted-foreground)] block">Designation:</span>
+                          <span className="font-bold text-purple-600 dark:text-purple-400">{submittedData.designation}</span>
+                        </div>
+                        <div>
+                          <span className="text-[var(--color-muted-foreground)] block">Cabin / Office:</span>
+                          <span className="font-semibold text-[var(--color-foreground)]">{submittedData.cabinNumber || 'Staff Room'}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-[var(--color-muted-foreground)] block">Specialization / Subjects:</span>
+                          <span className="font-semibold text-[var(--color-foreground)]">{submittedData.specialization || 'General Subject Staff'}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Institutional Workflow Instructions */}
+                <div className="p-3.5 rounded-lg border border-blue-500/20 bg-blue-500/5 text-left text-xs space-y-1.5">
+                  <div className="font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                    <Info className="w-3.5 h-3.5" /> What happens next?
+                  </div>
+                  <p className="text-[11px] text-[var(--color-muted-foreground)] leading-relaxed">
+                    Your Department Head of Department (HOD) will inspect your academic credentials and approve your account. While awaiting approval, your account remains safely locked. Once approved, you can immediately sign in with your credentials.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={handleReset}
+                  >
+                    Register Another Account
+                  </Button>
+                  <Button
+                    variant="primary"
+                    className="flex-1"
+                    icon={ArrowRight}
+                    onClick={() => navigate('/login')}
+                  >
+                    Proceed to Sign In
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              /* REGISTRATION FORM */
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Department Notification Banner */}
+                <div className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-muted)]/30 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4 h-4 text-[var(--color-primary)]" />
+                    <span className="text-[var(--color-muted-foreground)]">
+                      Routing target:{' '}
+                      <strong className="text-[var(--color-foreground)]">{formData.department} HOD</strong>
+                    </span>
+                  </div>
+                  <span className="text-[10px] px-2 py-0.5 rounded font-semibold bg-[var(--color-primary)]/10 text-[var(--color-primary)]">
+                    Direct HOD Verification
+                  </span>
+                </div>
+
+                {/* Name fields */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Input
                     label="First Name"
                     name="firstName"
-                    placeholder="Vignesh"
+                    placeholder={role === 'STUDENT' ? 'e.g. Vignesh' : 'e.g. Dr. Rajesh'}
                     value={formData.firstName}
                     onChange={handleChange}
                     disabled={loading}
@@ -204,7 +396,7 @@ export const SignupPage = () => {
                   <Input
                     label="Last Name"
                     name="lastName"
-                    placeholder="R"
+                    placeholder={role === 'STUDENT' ? 'e.g. Kumar' : 'e.g. Sharma'}
                     value={formData.lastName}
                     onChange={handleChange}
                     disabled={loading}
@@ -212,55 +404,73 @@ export const SignupPage = () => {
                   />
                 </div>
 
+                {/* Username & Email */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Input
                     label="Username"
                     name="username"
-                    placeholder="vignesh24"
+                    placeholder={role === 'STUDENT' ? 'vignesh24' : 'rajesh.sharma'}
                     value={formData.username}
                     onChange={handleChange}
                     disabled={loading}
                     required
+                    helperText="Unique username used to sign in"
                   />
                   <Input
                     label="Institutional Email"
                     name="email"
                     type="email"
-                    placeholder="vignesh@campus.edu"
+                    placeholder={role === 'STUDENT' ? 'vignesh@student.campus.edu' : 'r.sharma@faculty.campus.edu'}
                     value={formData.email}
                     onChange={handleChange}
                     disabled={loading}
                     required
+                    helperText="Campus-issued official email"
                   />
                 </div>
 
-                {/* Academic Hierarchy Information */}
-                <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-muted)]/20 space-y-3">
-                  <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-foreground)]">
-                    <GraduationCap className="w-4 h-4 text-[var(--color-primary)]" />
-                    <span>Academic Details</span>
-                  </div>
+                {/* Academic Department Selector */}
+                <div>
+                  <label className="block text-xs font-medium text-[var(--color-foreground)] mb-1">
+                    Academic Department
+                  </label>
+                  <select
+                    name="department"
+                    value={formData.department}
+                    onChange={handleChange}
+                    disabled={loading}
+                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)] text-xs py-2 px-3 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/40 focus:border-[var(--color-primary)]"
+                  >
+                    {DEPARTMENTS.map((dept) => (
+                      <option key={dept} value={dept}>
+                        {dept}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                  <div className="space-y-3">
-                    <div>
-                      <label className="block text-xs font-medium text-[var(--color-foreground)] mb-1">
-                        Department
-                      </label>
-                      <select
-                        name="department"
-                        value={formData.department}
-                        onChange={handleChange}
-                        className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)] text-xs py-2 px-3 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/40 focus:border-[var(--color-primary)]"
-                      >
-                        {DEPARTMENTS.map((dept) => (
-                          <option key={dept} value={dept}>
-                            {dept}
-                          </option>
-                        ))}
-                      </select>
+                {/* ROLE-SPECIFIC FIELDS */}
+                {role === 'STUDENT' ? (
+                  <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-muted)]/20 space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-foreground)]">
+                      <GraduationCap className="w-4 h-4 text-[var(--color-primary)]" />
+                      <span>Student Academic Details (Verified by HOD)</span>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <Input
+                          label="Roll Number"
+                          name="rollNumber"
+                          placeholder="e.g. 717824P388"
+                          value={formData.rollNumber}
+                          onChange={handleChange}
+                          disabled={loading}
+                          required
+                          helperText="University Roll / Reg No"
+                        />
+                      </div>
+
                       <div>
                         <label className="block text-xs font-medium text-[var(--color-foreground)] mb-1">
                           Section
@@ -269,6 +479,7 @@ export const SignupPage = () => {
                           name="section"
                           value={formData.section}
                           onChange={handleChange}
+                          disabled={loading}
                           className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)] text-xs py-2 px-3 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/40 focus:border-[var(--color-primary)]"
                         >
                           {SECTIONS.map((sec) => (
@@ -279,20 +490,81 @@ export const SignupPage = () => {
                         </select>
                       </div>
 
+                      <div>
+                        <label className="block text-xs font-medium text-[var(--color-foreground)] mb-1">
+                          Academic Year
+                        </label>
+                        <select
+                          name="year"
+                          value={formData.year}
+                          onChange={handleChange}
+                          disabled={loading}
+                          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)] text-xs py-2 px-3 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/40 focus:border-[var(--color-primary)]"
+                        >
+                          {YEARS.map((y) => (
+                            <option key={y.value} value={y.value}>
+                              {y.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-muted)]/20 space-y-3">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-[var(--color-foreground)]">
+                      <Briefcase className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                      <span>Faculty Appointment Details (Verified by HOD)</span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-[var(--color-foreground)] mb-1">
+                          Designation / Role
+                        </label>
+                        <select
+                          name="designation"
+                          value={formData.designation}
+                          onChange={handleChange}
+                          disabled={loading}
+                          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)] text-xs py-2 px-3 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/40 focus:border-[var(--color-primary)]"
+                        >
+                          {DESIGNATIONS.map((desig) => (
+                            <option key={desig} value={desig}>
+                              {desig}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <Input
+                          label="Cabin / Office Room"
+                          name="cabinNumber"
+                          placeholder="e.g. Block A - Room 204"
+                          value={formData.cabinNumber}
+                          onChange={handleChange}
+                          disabled={loading}
+                          helperText="Faculty desk or room location"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
                       <Input
-                        label="Roll Number"
-                        name="rollNumber"
-                        placeholder="e.g. 24CSE001"
-                        value={formData.rollNumber}
+                        label="Specialization / Subject Taught"
+                        name="specialization"
+                        placeholder="e.g. Cloud Computing, Distributed Systems, Discrete Mathematics"
+                        value={formData.specialization}
                         onChange={handleChange}
                         disabled={loading}
-                        required
-                        helperText="Unique university roll number"
+                        helperText="Subject expertise (Subject staff who are not class tutors)"
                       />
                     </div>
                   </div>
-                </div>
+                )}
 
+                {/* Password & Confirmation */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <PasswordInput
                     label="Password"
@@ -315,17 +587,37 @@ export const SignupPage = () => {
                   />
                 </div>
 
-                {/* Password checks */}
+                {/* Password validity indicators */}
                 <div className="p-3 rounded-lg bg-[var(--color-background)] border border-[var(--color-border)] text-xs space-y-1">
                   <div className="flex items-center gap-1.5">
-                    {isPasswordValid ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <X className="w-3.5 h-3.5 text-[var(--color-muted-foreground)]" />}
-                    <span className={isPasswordValid ? 'text-emerald-700 dark:text-emerald-400' : 'text-[var(--color-muted-foreground)]'}>
+                    {isPasswordValid ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    ) : (
+                      <X className="w-3.5 h-3.5 text-[var(--color-muted-foreground)]" />
+                    )}
+                    <span
+                      className={
+                        isPasswordValid
+                          ? 'text-emerald-700 dark:text-emerald-400'
+                          : 'text-[var(--color-muted-foreground)]'
+                      }
+                    >
                       At least 6 characters
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    {isMatch ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <X className="w-3.5 h-3.5 text-[var(--color-muted-foreground)]" />}
-                    <span className={isMatch ? 'text-emerald-700 dark:text-emerald-400' : 'text-[var(--color-muted-foreground)]'}>
+                    {isMatch ? (
+                      <Check className="w-3.5 h-3.5 text-emerald-500" />
+                    ) : (
+                      <X className="w-3.5 h-3.5 text-[var(--color-muted-foreground)]" />
+                    )}
+                    <span
+                      className={
+                        isMatch
+                          ? 'text-emerald-700 dark:text-emerald-400'
+                          : 'text-[var(--color-muted-foreground)]'
+                      }
+                    >
                       Passwords match
                     </span>
                   </div>
@@ -336,148 +628,23 @@ export const SignupPage = () => {
                   size="md"
                   loading={loading}
                   className="w-full"
-                  icon={UserPlus}
+                  icon={role === 'STUDENT' ? GraduationCap : Briefcase}
                 >
-                  {loading ? 'Creating student profile...' : 'Register as Student'}
-                </Button>
-              </form>
-            ) : staffSubmitted ? (
-              <div className="text-center py-6 space-y-4">
-                <div className="w-14 h-14 bg-emerald-100 dark:bg-emerald-950/50 text-emerald-600 rounded-full flex items-center justify-center mx-auto">
-                  <CheckCircle2 className="w-8 h-8" />
-                </div>
-                <h3 className="text-lg font-bold text-[var(--color-foreground)]">
-                  Request Submitted Successfully
-                </h3>
-                <p className="text-xs text-[var(--color-muted-foreground)] max-w-md mx-auto leading-relaxed">
-                  Your request for faculty access has been forwarded to the Academic Administration.
-                  Status: <span className="font-semibold text-amber-600 dark:text-amber-400">PENDING APPROVAL</span>.
-                </p>
-                <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-muted)]/20 text-left text-xs space-y-1.5">
-                  <p><span className="font-semibold text-[var(--color-foreground)]">Name:</span> {staffData.firstName} {staffData.lastName}</p>
-                  <p><span className="font-semibold text-[var(--color-foreground)]">Email:</span> {staffData.email}</p>
-                  <p><span className="font-semibold text-[var(--color-foreground)]">Department:</span> {staffData.department}</p>
-                  <p><span className="font-semibold text-[var(--color-foreground)]">Designation:</span> {staffData.designation}</p>
-                </div>
-                <p className="text-xs text-[var(--color-muted-foreground)]">
-                  Once an administrator approves your request, you will receive an invitation link to set your password and activate your account.
-                </p>
-                <div className="pt-2">
-                  <Button variant="outline" onClick={() => navigate('/login')}>
-                    Return to Sign In
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <form onSubmit={handleStaffRequest} className="space-y-4">
-                <div className="p-3.5 rounded-lg border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/30 text-amber-800 dark:text-amber-300 text-xs flex items-start gap-2.5">
-                  <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
-                  <div>
-                    <span className="font-semibold">Faculty Governance Notice:</span> In accordance with institutional security policy, faculty accounts cannot self-register directly. Prospective faculty members submit an access request which is reviewed by the Campus Administrator before credentials are created.
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Input
-                    label="First Name"
-                    name="firstName"
-                    placeholder="Prof. Rajesh"
-                    value={staffData.firstName}
-                    onChange={handleStaffChange}
-                    disabled={loading}
-                    required
-                  />
-                  <Input
-                    label="Last Name"
-                    name="lastName"
-                    placeholder="Sharma"
-                    value={staffData.lastName}
-                    onChange={handleStaffChange}
-                    disabled={loading}
-                    required
-                  />
-                </div>
-
-                <Input
-                  label="Institutional Email"
-                  name="email"
-                  type="email"
-                  placeholder="rajesh.sharma@campus.edu"
-                  value={staffData.email}
-                  onChange={handleStaffChange}
-                  disabled={loading}
-                  required
-                  helperText="Your official campus or university email address"
-                />
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--color-foreground)] mb-1">
-                      Academic Department
-                    </label>
-                    <select
-                      name="department"
-                      value={staffData.department}
-                      onChange={handleStaffChange}
-                      className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)] text-xs py-2 px-3 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/40 focus:border-[var(--color-primary)]"
-                    >
-                      {DEPARTMENTS.map((dept) => (
-                        <option key={dept} value={dept}>
-                          {dept}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--color-foreground)] mb-1">
-                      Designation / Role
-                    </label>
-                    <select
-                      name="designation"
-                      value={staffData.designation}
-                      onChange={handleStaffChange}
-                      className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)] text-xs py-2 px-3 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/40 focus:border-[var(--color-primary)]"
-                    >
-                      {DESIGNATIONS.map((desig) => (
-                        <option key={desig} value={desig}>
-                          {desig}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-[var(--color-foreground)] mb-1">
-                    Notes / Remarks (Optional)
-                  </label>
-                  <textarea
-                    name="notes"
-                    rows={2}
-                    placeholder="e.g. Appointed as Assistant Professor for Data Structures, joining Fall 2026."
-                    value={staffData.notes}
-                    onChange={handleStaffChange}
-                    disabled={loading}
-                    className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)] text-xs py-2 px-3 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/40 focus:border-[var(--color-primary)]"
-                  />
-                </div>
-
-                <Button
-                  type="submit"
-                  size="md"
-                  loading={loading}
-                  className="w-full"
-                  icon={Briefcase}
-                >
-                  {loading ? 'Submitting request...' : 'Submit Faculty Request'}
+                  {loading
+                    ? 'Submitting to HOD...'
+                    : role === 'STUDENT'
+                    ? 'Submit Student Registration for HOD Approval'
+                    : 'Submit Faculty Registration for HOD Approval'}
                 </Button>
               </form>
             )}
 
             <p className="text-center text-xs text-[var(--color-muted-foreground)] pt-2 border-t border-[var(--color-border)]">
-              Already have an account?{' '}
-              <Link to="/login" className="font-semibold text-[var(--color-primary)] hover:underline">
+              Already have an approved account?{' '}
+              <Link
+                to="/login"
+                className="font-semibold text-[var(--color-primary)] hover:underline"
+              >
                 Sign in
               </Link>
             </p>
@@ -489,4 +656,3 @@ export const SignupPage = () => {
 };
 
 export default SignupPage;
-

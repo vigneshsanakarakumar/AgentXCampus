@@ -75,6 +75,16 @@ public class AuthController {
         }
     }
 
+    @PostMapping("/register-request")
+    public ResponseEntity<?> registerRequest(@RequestBody UserRegistrationDto request) {
+        try {
+            Map<String, Object> result = authService.registerUser(request);
+            return ResponseEntity.ok(result);
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(Map.of("message", ex.getMessage()));
+        }
+    }
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request) {
         try {

@@ -56,6 +56,10 @@ public class AuditLog {
         this.createdAt = LocalDateTime.now();
     }
 
+    public AuditLog(String actorUsername, String actionType, String entityType, Long entityId, String details) {
+        this(null, actionType, entityType, entityId, actorUsername, "STAFF", details, "SUCCESS");
+    }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

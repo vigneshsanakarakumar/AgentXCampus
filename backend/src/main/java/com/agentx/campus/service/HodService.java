@@ -24,6 +24,8 @@ public class HodService {
     private final UserRepository userRepository;
     private final DocumentIngestionAgent documentIngestionAgent;
     private final NotificationAgent notificationAgent;
+    private final UserRegistrationRequestRepository userRegistrationRequestRepository;
+    private final AuditLogRepository auditLogRepository;
 
     public HodService(
             HodProfileRepository hodProfileRepository,
@@ -35,7 +37,9 @@ public class HodService {
             AnnouncementRepository announcementRepository,
             UserRepository userRepository,
             DocumentIngestionAgent documentIngestionAgent,
-            NotificationAgent notificationAgent) {
+            NotificationAgent notificationAgent,
+            UserRegistrationRequestRepository userRegistrationRequestRepository,
+            AuditLogRepository auditLogRepository) {
         this.hodProfileRepository = hodProfileRepository;
         this.facultyProfileRepository = facultyProfileRepository;
         this.facultyMentorSectionRepository = facultyMentorSectionRepository;
@@ -46,6 +50,8 @@ public class HodService {
         this.userRepository = userRepository;
         this.documentIngestionAgent = documentIngestionAgent;
         this.notificationAgent = notificationAgent;
+        this.userRegistrationRequestRepository = userRegistrationRequestRepository;
+        this.auditLogRepository = auditLogRepository;
     }
 
     public String resolveDepartmentForHod(String username) {
@@ -83,6 +89,8 @@ public class HodService {
                 .limit(5)
                 .collect(Collectors.toList());
 
+        long pendingRegistrations = userRegistrationRequestRepository.countByDepartmentAndStatus(dept, "PENDING");
+
         Map<String, Object> response = new HashMap<>();
         response.put("department", dept);
         response.put("hodName", hodProfile != null ? hodProfile.getHodName() : "Head of Department");
@@ -93,6 +101,7 @@ public class HodService {
         response.put("sections", sections);
         response.put("avgAttendanceRate", Math.round(avgAttendance * 10.0) / 10.0);
         response.put("pendingFacultyLeaveRequestsCount", pendingLeaves.size());
+        response.put("pendingRegistrationsCount", pendingRegistrations);
         response.put("recentAnnouncements", announcements);
 
         return response;
@@ -190,5 +199,87 @@ public class HodService {
                                              String sectionHint, String hodUsername) {
         String dept = resolveDepartmentForHod(hodUsername);
         return documentIngestionAgent.ingestDocument(fileBytes, filename, textOverride, hodUsername, dept, sectionHint);
+    }
+
+    public List<UserRegistrationRequest> getDepartmentRegistrations(String hodUsername, String statusFilter) {
+        String dept = resolveDepartmentForHod(hodUsername);
+        if (statusFilter != null && !statusFilter.isBlank() && !"ALL".equalsIgnoreCase(statusFilter)) {
+            return userRegistrationRequestRepository.findByDepartmentAndStatusOrderByCreatedAtDesc(dept, statusFilter.toUpperCase());
+        }
+        return userRegistrationRequestRepository.findByDepartmentOrderByCreatedAtDesc(dept);
+    }
+
+    @Transactional
+    public UserRegistrationRequest approveRegistration(Long requestId, String hodUsername) {
+        String dept = resolveDepartmentForHod(hodUsername);
+        UserRegistrationRequest req = userRegistrationRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Registration request not found: " + requestId));
+
+        if (!dept.equalsIgnoreCase(req.getDepartment())) {
+            throw new org.springframework.security.access.AccessDeniedException("Unauthorized: This registration request does not belong to your department (" + dept + ").");
+        }
+
+        req.setStatus("APPROVED");
+        req.setResolvedAt(LocalDateTime.now());
+        User hod = userRepository.findByUsername(hodUsername).orElse(null);
+        req.setHodUser(hod);
+        UserRegistrationRequest saved = userRegistrationRequestRepository.save(req);
+
+        // Activate underlying user
+        User user = req.getUser();
+        if (user == null) {
+            user = userRepository.findByUsername(req.getUsername()).orElse(null);
+        }
+        if (user != null) {
+            user.setActive(true);
+            user.setUpdatedAt(LocalDateTime.now());
+            userRepository.save(user);
+
+            // Audit Log
+            auditLogRepository.save(new AuditLog(
+                    hodUsername,
+                    "HOD_APPROVE_REGISTRATION",
+                    "USER_REGISTRATION",
+                    requestId,
+                    "HOD approved registration for " + req.getUsername() + " as " + req.getRole() + " in " + req.getDepartment()
+            ));
+
+            // Notify user
+            String title = "Registration Approved by HOD";
+            String msg = "Congratulations! Your registration as " + req.getRole() + " in " + req.getDepartment()
+                    + " has been verified and approved by your Head of Department. You may now log in to AgentX Campus.";
+            notificationAgent.notifyUser(user, title, msg, "ACCOUNT_APPROVED", "Department HOD Decision");
+        }
+
+        return saved;
+    }
+
+    @Transactional
+    public UserRegistrationRequest rejectRegistration(Long requestId, String reason, String hodUsername) {
+        String dept = resolveDepartmentForHod(hodUsername);
+        UserRegistrationRequest req = userRegistrationRequestRepository.findById(requestId)
+                .orElseThrow(() -> new IllegalArgumentException("Registration request not found: " + requestId));
+
+        if (!dept.equalsIgnoreCase(req.getDepartment())) {
+            throw new org.springframework.security.access.AccessDeniedException("Unauthorized: This registration request does not belong to your department (" + dept + ").");
+        }
+
+        req.setStatus("REJECTED");
+        req.setRejectionReason(reason != null && !reason.isBlank() ? reason : "Rejected by Department Head of Department.");
+        req.setResolvedAt(LocalDateTime.now());
+        User hod = userRepository.findByUsername(hodUsername).orElse(null);
+        req.setHodUser(hod);
+        UserRegistrationRequest saved = userRegistrationRequestRepository.save(req);
+
+        // Audit Log
+        auditLogRepository.save(new AuditLog(
+                hodUsername,
+                "HOD_REJECT_REGISTRATION",
+                "USER_REGISTRATION",
+                requestId,
+                "HOD rejected registration for " + req.getUsername() + " (" + req.getRole() + "). Reason: " + req.getRejectionReason()
+        ));
+
+        return saved;
     }
 }

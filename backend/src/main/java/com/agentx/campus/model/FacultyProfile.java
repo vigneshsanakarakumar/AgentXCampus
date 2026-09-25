@@ -25,6 +25,7 @@ public class FacultyProfile {
     private String assignedSection;
     private boolean isMentor = true;
     private String cabinNumber;
+    private String specialization;
 
     @OneToMany(mappedBy = "facultyProfile", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
@@ -59,6 +60,9 @@ public class FacultyProfile {
 
     public String getCabinNumber() { return cabinNumber; }
     public void setCabinNumber(String cabinNumber) { this.cabinNumber = cabinNumber; }
+
+    public String getSpecialization() { return specialization; }
+    public void setSpecialization(String specialization) { this.specialization = specialization; }
 
     public java.util.List<FacultyMentorSection> getMentorSections() { return mentorSections; }
     public void setMentorSections(java.util.List<FacultyMentorSection> mentorSections) { this.mentorSections = mentorSections; }
