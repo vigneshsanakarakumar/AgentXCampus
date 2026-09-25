@@ -11,6 +11,7 @@ import java.util.Optional;
 @Repository
 public interface FacultyMentorSectionRepository extends JpaRepository<FacultyMentorSection, Long> {
     List<FacultyMentorSection> findByFacultyProfile(FacultyProfile facultyProfile);
+    List<FacultyMentorSection> findByFacultyProfileId(Long facultyProfileId);
     List<FacultyMentorSection> findByFacultyProfile_User_Username(String username);
     Optional<FacultyMentorSection> findFirstByDepartmentAndSection(String department, String section);
     Optional<FacultyMentorSection> findFirstByDepartmentAndSectionAndSemester(String department, String section, Integer semester);

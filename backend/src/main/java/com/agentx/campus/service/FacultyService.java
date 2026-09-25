@@ -1,4 +1,5 @@
 package com.agentx.campus.service;
+import com.agentx.campus.agent.DocumentIngestionAgent;
 import com.agentx.campus.agent.NotificationAgent;
 import com.agentx.campus.dto.CourseworkRequestDto;
 import com.agentx.campus.dto.GrievanceRequest;
@@ -25,6 +26,13 @@ public class FacultyService {
     private final GrievanceRepository grievanceRepository;
     private final CampusToolRegistry campusToolRegistry;
     private final NotificationAgent notificationAgent;
+    private final FacultyLeaveRequestRepository facultyLeaveRequestRepository;
+    private final HodProfileRepository hodProfileRepository;
+    private final CampusEventRepository campusEventRepository;
+    private final DocumentIngestionAgent documentIngestionAgent;
+    private final AttendanceSessionRepository attendanceSessionRepository;
+    private final AttendanceEntryRepository attendanceEntryRepository;
+    private final AttendanceRecordRepository attendanceRecordRepository;
 
     public FacultyService(UserRepository userRepository,
                           FacultyProfileRepository facultyProfileRepository,
@@ -34,7 +42,14 @@ public class FacultyService {
                           FacultyMentorSectionRepository facultyMentorSectionRepository,
                           GrievanceRepository grievanceRepository,
                           CampusToolRegistry campusToolRegistry,
-                          NotificationAgent notificationAgent) {
+                          NotificationAgent notificationAgent,
+                          FacultyLeaveRequestRepository facultyLeaveRequestRepository,
+                          HodProfileRepository hodProfileRepository,
+                          CampusEventRepository campusEventRepository,
+                          DocumentIngestionAgent documentIngestionAgent,
+                          AttendanceSessionRepository attendanceSessionRepository,
+                          AttendanceEntryRepository attendanceEntryRepository,
+                          AttendanceRecordRepository attendanceRecordRepository) {
         this.userRepository = userRepository;
         this.facultyProfileRepository = facultyProfileRepository;
         this.studentProfileRepository = studentProfileRepository;
@@ -44,6 +59,13 @@ public class FacultyService {
         this.grievanceRepository = grievanceRepository;
         this.campusToolRegistry = campusToolRegistry;
         this.notificationAgent = notificationAgent;
+        this.facultyLeaveRequestRepository = facultyLeaveRequestRepository;
+        this.hodProfileRepository = hodProfileRepository;
+        this.campusEventRepository = campusEventRepository;
+        this.documentIngestionAgent = documentIngestionAgent;
+        this.attendanceSessionRepository = attendanceSessionRepository;
+        this.attendanceEntryRepository = attendanceEntryRepository;
+        this.attendanceRecordRepository = attendanceRecordRepository;
     }
 
     public Map<String, Object> getFacultyDashboard(String username) {
@@ -420,5 +442,122 @@ public class FacultyService {
                 req.getUrgency(),
                 req.getDepartment()
         );
+    }
+
+    // --- TASK: Faculty Leave / Permission Request to HOD ---
+
+    @Transactional
+    public FacultyLeaveRequest submitFacultyLeaveRequest(String facultyUsername, Map<String, Object> body) {
+        User faculty = userRepository.findByUsername(facultyUsername)
+                .orElseThrow(() -> new IllegalArgumentException("Faculty user not found: " + facultyUsername));
+        FacultyProfile profile = facultyProfileRepository.findByUser(faculty).orElse(null);
+        String dept = profile != null ? profile.getDepartment() : "Computer Science & Engineering";
+
+        String leaveType = body.getOrDefault("leaveType", "CASUAL_LEAVE").toString();
+        LocalDate fromDate = LocalDate.parse(body.get("fromDate").toString());
+        LocalDate toDate = LocalDate.parse(body.get("toDate").toString());
+        String substitute = body.getOrDefault("substituteFacultyName", "").toString();
+        String reason = body.getOrDefault("reason", "Personal leave request").toString();
+
+        FacultyLeaveRequest req = new FacultyLeaveRequest();
+        req.setFaculty(faculty);
+        req.setDepartment(dept);
+        req.setLeaveType(leaveType);
+        req.setFromDate(fromDate);
+        req.setToDate(toDate);
+        req.setSubstituteFacultyName(substitute);
+        req.setReason(reason);
+        req.setStatus("PENDING");
+
+        // Find HOD of this department
+        hodProfileRepository.findByDepartment(dept).ifPresent(hp -> {
+            req.setHodUser(hp.getUser());
+            // Real-time SSE alert to HOD
+            if (hp.getUser() != null) {
+                notificationAgent.notifyUser(
+                        hp.getUser(),
+                        "New Faculty Leave Request",
+                        faculty.getFirstName() + " " + faculty.getLastName() + " requested " + leaveType + " (" + fromDate + " to " + toDate + ").",
+                        "LEAVE_UPDATE",
+                        "Department Leave Application"
+                );
+            }
+        });
+
+        return facultyLeaveRequestRepository.save(req);
+    }
+
+    public List<FacultyLeaveRequest> getMyFacultyLeaveRequests(String facultyUsername) {
+        User faculty = userRepository.findByUsername(facultyUsername).orElse(null);
+        if (faculty == null) return Collections.emptyList();
+        return facultyLeaveRequestRepository.findByFacultyOrderByCreatedAtDesc(faculty);
+    }
+
+    // --- TASK: Faculty Timetable Upload (Individual staff or class timetable if mentor) ---
+
+    public Map<String, Object> uploadTimetable(byte[] fileBytes, String filename, String textOverride,
+                                               boolean isClassTimetable, String section, String facultyUsername) {
+        User user = userRepository.findByUsername(facultyUsername)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + facultyUsername));
+        FacultyProfile profile = facultyProfileRepository.findByUser(user).orElse(null);
+        String dept = profile != null ? profile.getDepartment() : "Computer Science & Engineering";
+
+        String targetSection = isClassTimetable ? section : null;
+        return documentIngestionAgent.ingestDocument(fileBytes, filename, textOverride, facultyUsername, dept, targetSection);
+    }
+
+    // --- TASK: Quick Attendance Marker for current date ---
+
+    @Transactional
+    public Map<String, Object> quickMarkAttendance(String facultyUsername, Long sectionId, String dateStr,
+                                                   List<Long> absentStudentIds, String remarks) {
+        User faculty = userRepository.findByUsername(facultyUsername)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + facultyUsername));
+        FacultyMentorSection section = facultyMentorSectionRepository.findById(sectionId)
+                .orElseThrow(() -> new IllegalArgumentException("Mentor section not found: " + sectionId));
+
+        LocalDate date = dateStr != null && !dateStr.isBlank() ? LocalDate.parse(dateStr) : LocalDate.now();
+        List<StudentProfile> students = studentProfileRepository.findByDepartmentAndSection(section.getDepartment(), section.getSection());
+
+        // Find or create session for this date
+        AttendanceSession session = new AttendanceSession();
+        session.setSection(section);
+        session.setFaculty(faculty);
+        session.setSubjectCode("MENTOR-SEC");
+        session.setSubjectName("Daily Roll Call");
+        session.setSessionDate(date);
+        session.setPeriod("Full Day");
+        session = attendanceSessionRepository.save(session);
+
+        Set<Long> absentSet = new HashSet<>(absentStudentIds != null ? absentStudentIds : Collections.emptyList());
+        List<AttendanceEntry> entries = new ArrayList<>();
+
+        for (StudentProfile sp : students) {
+            AttendanceEntry entry = new AttendanceEntry();
+            entry.setSession(session);
+            entry.setStudent(sp.getUser());
+            boolean isAbsent = absentSet.contains(sp.getUser().getId());
+            entry.setStatus(isAbsent ? "ABSENT" : "PRESENT");
+            entry.setRemarks(isAbsent ? (remarks != null ? remarks : "Marked absent by mentor") : "Present");
+            entries.add(entry);
+        }
+        attendanceEntryRepository.saveAll(entries);
+
+        Map<String, Object> res = new HashMap<>();
+        res.put("sessionId", session.getId());
+        res.put("date", date);
+        res.put("totalStudents", students.size());
+        res.put("absentCount", absentSet.size());
+        res.put("presentCount", students.size() - absentSet.size());
+        return res;
+    }
+
+    // --- TASK: View Department Events ---
+
+    public List<CampusEvent> getFacultyEvents(String facultyUsername) {
+        User user = userRepository.findByUsername(facultyUsername).orElse(null);
+        FacultyProfile profile = user != null ? facultyProfileRepository.findByUser(user).orElse(null) : null;
+        String dept = profile != null ? profile.getDepartment() : "Computer Science & Engineering";
+        return campusEventRepository.findForDepartment(dept);
     }
 }

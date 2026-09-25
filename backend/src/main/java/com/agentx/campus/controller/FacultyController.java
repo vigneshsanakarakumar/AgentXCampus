@@ -187,4 +187,66 @@ public class FacultyController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
+    // --- TASK: Faculty Leave / Permission Request to HOD ---
+
+    @PostMapping("/leave-requests")
+    public ResponseEntity<?> submitFacultyLeaveRequest(Authentication auth, @RequestBody Map<String, Object> body) {
+        return ResponseEntity.ok(facultyService.submitFacultyLeaveRequest(auth.getName(), body));
+    }
+
+    @GetMapping("/leave-requests/my")
+    public ResponseEntity<?> getMyFacultyLeaveRequests(Authentication auth) {
+        return ResponseEntity.ok(facultyService.getMyFacultyLeaveRequests(auth.getName()));
+    }
+
+    // --- TASK: Faculty Timetable Upload (Individual staff or class timetable) ---
+
+    @PostMapping(value = "/timetable/upload")
+    public ResponseEntity<?> uploadTimetable(
+            Authentication auth,
+            @RequestParam(value = "file", required = false) org.springframework.web.multipart.MultipartFile file,
+            @RequestParam(value = "textOverride", required = false) String textOverride,
+            @RequestParam(value = "isClassTimetable", defaultValue = "false") boolean isClassTimetable,
+            @RequestParam(value = "section", required = false) String section,
+            @RequestBody(required = false) Map<String, Object> jsonBody) {
+        try {
+            byte[] bytes = file != null ? file.getBytes() : null;
+            String filename = file != null ? file.getOriginalFilename() : "timetable.txt";
+            String text = textOverride;
+            boolean isClass = isClassTimetable;
+            String sec = section;
+            if (jsonBody != null) {
+                if (text == null && jsonBody.containsKey("textOverride")) text = String.valueOf(jsonBody.get("textOverride"));
+                if (jsonBody.containsKey("isClassTimetable")) isClass = Boolean.parseBoolean(String.valueOf(jsonBody.get("isClassTimetable")));
+                if (sec == null && jsonBody.containsKey("section")) sec = String.valueOf(jsonBody.get("section"));
+            }
+            return ResponseEntity.ok(facultyService.uploadTimetable(bytes, filename, text, isClass, sec, auth.getName()));
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(Map.of("success", false, "error", ex.getMessage()));
+        }
+    }
+
+    // --- TASK: Quick Attendance Marker for current date ---
+
+    @PostMapping("/attendance/quick-mark")
+    public ResponseEntity<?> quickMarkAttendance(Authentication auth, @RequestBody Map<String, Object> body) {
+        Long sectionId = Long.valueOf(body.get("sectionId").toString());
+        String dateStr = body.getOrDefault("date", "").toString();
+        java.util.List<Long> absentStudentIds = new java.util.ArrayList<>();
+        if (body.get("absentStudentIds") instanceof java.util.List<?> list) {
+            for (Object item : list) {
+                absentStudentIds.add(Long.valueOf(item.toString()));
+            }
+        }
+        String remarks = (String) body.get("remarks");
+        return ResponseEntity.ok(facultyService.quickMarkAttendance(auth.getName(), sectionId, dateStr, absentStudentIds, remarks));
+    }
+
+    // --- TASK: View Department Events ---
+
+    @GetMapping("/events")
+    public ResponseEntity<?> getFacultyEvents(Authentication auth) {
+        return ResponseEntity.ok(facultyService.getFacultyEvents(auth.getName()));
+    }
 }

@@ -37,6 +37,7 @@ export const RequireRole = ({ allowedRoles, children }) => {
     // Redirect to their respective authorized portal
     if (role === 'STUDENT') return <Navigate to="/dashboard" replace />;
     if (role === 'FACULTY') return <Navigate to="/faculty/dashboard" replace />;
+    if (role === 'HOD') return <Navigate to="/hod/dashboard" replace />;
     if (role === 'STAFF') return <Navigate to="/staff/dashboard" replace />;
     if (role === 'ADMIN') return <Navigate to="/admin/dashboard" replace />;
     return <Navigate to="/login" replace />;
@@ -55,6 +56,7 @@ export const RequireGuest = ({ children }) => {
   if (isAuthenticated && role) {
     if (role === 'STUDENT') return <Navigate to="/dashboard" replace />;
     if (role === 'FACULTY') return <Navigate to="/faculty/dashboard" replace />;
+    if (role === 'HOD') return <Navigate to="/hod/dashboard" replace />;
     if (role === 'STAFF') return <Navigate to="/staff/dashboard" replace />;
     if (role === 'ADMIN') return <Navigate to="/admin/dashboard" replace />;
   }

@@ -59,6 +59,28 @@ public class NotificationAgent {
         }
     }
 
+    @Transactional
+    public void notifyDepartment(String department, String title, String message, String type) {
+        List<StudentProfile> students = studentProfileRepository.findByDepartment(department);
+        String matchedBecause = "Department: " + department;
+        for (StudentProfile sp : students) {
+            if (sp.getUser() != null) {
+                notifyUser(sp.getUser(), title, message, type, matchedBecause);
+            }
+        }
+    }
+
+    @Transactional
+    public void notifyAllUsers(String title, String message, String type) {
+        List<StudentProfile> students = studentProfileRepository.findAll();
+        String matchedBecause = "Institution-wide Announcement";
+        for (StudentProfile sp : students) {
+            if (sp.getUser() != null) {
+                notifyUser(sp.getUser(), title, message, type, matchedBecause);
+            }
+        }
+    }
+
     public List<Notification> getNotificationsForUser(User user) {
         return notificationRepository.findByUserOrderByCreatedAtDesc(user);
     }

@@ -62,6 +62,7 @@ export const Navbar = () => {
   const getRoleBadgeVariant = (r) => {
     switch (r) {
       case 'ADMIN': return 'danger';
+      case 'HOD': return 'primary';
       case 'FACULTY': return 'info';
       case 'STAFF': return 'warning';
       default: return 'primary';

@@ -33,6 +33,8 @@ public class DataInitializer implements CommandLineRunner {
     private final ODRequestRepository odRequestRepository;
     private final GatePassRequestRepository gatePassRequestRepository;
     private final NotificationRepository notificationRepository;
+    private final HodProfileRepository hodProfileRepository;
+    private final FacultyLeaveRequestRepository facultyLeaveRequestRepository;
     private final PasswordEncoder passwordEncoder;
 
     public DataInitializer(
@@ -54,6 +56,8 @@ public class DataInitializer implements CommandLineRunner {
             ODRequestRepository odRequestRepository,
             GatePassRequestRepository gatePassRequestRepository,
             NotificationRepository notificationRepository,
+            HodProfileRepository hodProfileRepository,
+            FacultyLeaveRequestRepository facultyLeaveRequestRepository,
             PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.studentProfileRepository = studentProfileRepository;
@@ -73,6 +77,8 @@ public class DataInitializer implements CommandLineRunner {
         this.odRequestRepository = odRequestRepository;
         this.gatePassRequestRepository = gatePassRequestRepository;
         this.notificationRepository = notificationRepository;
+        this.hodProfileRepository = hodProfileRepository;
+        this.facultyLeaveRequestRepository = facultyLeaveRequestRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
@@ -143,6 +149,39 @@ public class DataInitializer implements CommandLineRunner {
             studentProfileRepository.save(profile);
             System.out.println("[DataInitializer] Seeded student profile for 717824P361 (vasan)");
         }
+
+        // HOD account: hod.cse / faculty123 (Head of CSE)
+        Optional<User> hodOpt = userRepository.findByUsername("hod.cse");
+        User hod;
+        if (hodOpt.isEmpty()) {
+            hod = new User(
+                    "hod.cse",
+                    "hod.cse@campus.edu",
+                    passwordEncoder.encode("faculty123"),
+                    Role.HOD,
+                    "Dr. Arulmozhi",
+                    "V"
+            );
+            hod = userRepository.save(hod);
+            System.out.println("[DataInitializer] Seeded HOD: hod.cse / faculty123");
+        } else {
+            hod = hodOpt.get();
+            hod.setRole(Role.HOD);
+            hod.setPasswordHash(passwordEncoder.encode("faculty123"));
+            hod.setActive(true);
+            userRepository.save(hod);
+        }
+
+        if (hodProfileRepository.findByUser(hod).isEmpty()) {
+            HodProfile hodProfile = new HodProfile(
+                    hod,
+                    "Computer Science & Engineering",
+                    "Block A - Room 100",
+                    "+91 94432 10987"
+            );
+            hodProfileRepository.save(hodProfile);
+            System.out.println("[DataInitializer] Seeded HodProfile for Dr. Arulmozhi V (hod.cse)");
+        }
     }
 
     private void seedCampusResources() {
@@ -171,7 +210,7 @@ public class DataInitializer implements CommandLineRunner {
             fp.setUser(u1);
             fp.setEmployeeId("EMP-CSE-101");
             fp.setDepartment("Computer Science & Engineering");
-            fp.setDesignation("Professor & Head of Department");
+            fp.setDesignation("Professor & Associate Dean");
             fp.setAssignedDepartment("Computer Science & Engineering");
             fp.setAssignedSection("C");
             fp.setMentor(true);
@@ -255,6 +294,21 @@ public class DataInitializer implements CommandLineRunner {
                     "Associate Professor & AI Lab Director"
             );
             staffLoginRequestRepository.save(req);
+        }
+
+        if (facultyLeaveRequestRepository.count() == 0) {
+            FacultyLeaveRequest leave = new FacultyLeaveRequest();
+            leave.setFaculty(u2); // Dr. M. Priya
+            leave.setLeaveType("ON_DUTY");
+            leave.setFromDate(LocalDate.now().plusDays(2));
+            leave.setToDate(LocalDate.now().plusDays(3));
+            leave.setSubstituteFacultyName("Prof. R. Anand");
+            leave.setReason("Attending IEEE International Conference on Generative AI as session speaker");
+            leave.setStatus("PENDING");
+            leave.setDepartment("Computer Science & Engineering");
+            leave.setCreatedAt(LocalDateTime.now().minusHours(4));
+            facultyLeaveRequestRepository.save(leave);
+            System.out.println("[DataInitializer] Seeded sample FacultyLeaveRequest for Dr. M. Priya");
         }
 
         System.out.println("[DataInitializer] Seeded 4 active Faculty Mentors (priya.m -> Sec A, suresh.s -> Sec B, ramesh.k -> Sec C, anand.r -> Sec D)");

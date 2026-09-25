@@ -173,8 +173,8 @@ public class StudentService {
         }
 
         List<Grievance> grievances = grievanceRepository.findByUserOrderByCreatedAtDesc(user);
-        List<CampusEvent> events = campusEventRepository.findAllByOrderByEventDateAsc();
-        List<Announcement> announcements = announcementRepository.findTop5ByOrderByCreatedAtDesc();
+        List<CampusEvent> events = campusEventRepository.findForStudent(dept, sec);
+        List<Announcement> announcements = announcementRepository.findForStudent(dept, sec);
         List<StudentTask> tasks = studentTaskRepository.findByUserOrderByCreatedAtDesc(user);
 
         response.put("attendanceRecords", attendanceRecords);

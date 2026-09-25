@@ -15,5 +15,6 @@ public interface FacultyProfileRepository extends JpaRepository<FacultyProfile, 
     boolean existsByEmployeeId(String employeeId);
     Optional<FacultyProfile> findFirstByAssignedDepartmentAndAssignedSection(String assignedDepartment, String assignedSection);
     Optional<FacultyProfile> findFirstByAssignedDepartmentAndAssignedSectionAndIsMentorTrue(String assignedDepartment, String assignedSection);
+    List<FacultyProfile> findByDepartment(String department);
     List<FacultyProfile> findAll();
 }

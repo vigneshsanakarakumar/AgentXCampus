@@ -20,6 +20,7 @@ import StudentAssistantPage from './pages/student/StudentAssistantPage';
 
 import FacultyPortal from './pages/FacultyPortal';
 import FacultyClassRosterPage from './pages/FacultyClassRosterPage';
+import HodPortal from './pages/HodPortal';
 import StaffPortal from './pages/StaffPortal';
 import AdminPortal from './pages/AdminPortal';
 import ActivateStaffPage from './pages/ActivateStaffPage';
@@ -85,6 +86,18 @@ export default function App() {
               }
             />
             <Route path="/faculty" element={<Navigate to="/faculty/dashboard" replace />} />
+
+            <Route
+              path="/hod/dashboard"
+              element={
+                <RequireAuth>
+                  <RequireRole allowedRoles={['HOD', 'ADMIN']}>
+                    <HodPortal />
+                  </RequireRole>
+                </RequireAuth>
+              }
+            />
+            <Route path="/hod" element={<Navigate to="/hod/dashboard" replace />} />
 
             <Route
               path="/staff/dashboard"

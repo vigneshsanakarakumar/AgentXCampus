@@ -9,6 +9,7 @@ import java.util.List;
 @Repository
 public interface TimetableEntryRepository extends JpaRepository<TimetableEntry, Long> {
     List<TimetableEntry> findByDepartmentAndSectionOrderByDayOfWeekAscStartTimeAsc(String department, String section);
+    List<TimetableEntry> findByDepartmentOrderBySectionAscDayOfWeekAscStartTimeAsc(String department);
     List<TimetableEntry> findByDepartmentAndSectionAndDayOfWeekOrderByStartTimeAsc(String department, String section, String dayOfWeek);
     List<TimetableEntry> findAllByOrderByDepartmentAscSectionAscDayOfWeekAscStartTimeAsc();
     List<TimetableEntry> findByFacultyUserIdOrderByDayOfWeekAscStartTimeAsc(Long facultyUserId);

@@ -83,6 +83,141 @@ export const FacultyPortal = () => {
   });
   const [submittingTimetable, setSubmittingTimetable] = useState(false);
 
+  // Leave to HOD State
+  const [myLeaves, setMyLeaves] = useState([]);
+  const [loadingLeaves, setLoadingLeaves] = useState(false);
+  const [leaveForm, setLeaveForm] = useState({
+    leaveType: 'CASUAL_LEAVE',
+    fromDate: '',
+    toDate: '',
+    substituteFacultyName: '',
+    reason: ''
+  });
+  const [submittingLeave, setSubmittingLeave] = useState(false);
+
+  // Timetable Upload State
+  const [ttFile, setTtFile] = useState(null);
+  const [ttText, setTtText] = useState('');
+  const [ttIsClass, setTtIsClass] = useState(false);
+  const [ttSection, setTtSection] = useState('A');
+  const [uploadingTt, setUploadingTt] = useState(false);
+  const [ttUploadResult, setTtUploadResult] = useState(null);
+
+  // Quick Attendance State
+  const [absentMap, setAbsentMap] = useState({});
+  const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
+  const [submittingAttendance, setSubmittingAttendance] = useState(false);
+  const [attendanceRemarks, setAttendanceRemarks] = useState('');
+
+  // Department Events State
+  const [deptEvents, setDeptEvents] = useState([]);
+  const [loadingDeptEvents, setLoadingDeptEvents] = useState(false);
+
+  const fetchLeaves = async () => {
+    setLoadingLeaves(true);
+    try {
+      const res = await api.get('/faculty/leave-requests/my');
+      setMyLeaves(res.data || []);
+    } catch (err) {
+      console.error('Failed to load faculty leaves', err);
+    } finally {
+      setLoadingLeaves(false);
+    }
+  };
+
+  const handleApplyLeave = async (e) => {
+    e.preventDefault();
+    setSubmittingLeave(true);
+    try {
+      await api.post('/faculty/leave-requests', leaveForm);
+      addToast('Leave request submitted to HOD successfully!', 'success');
+      setLeaveForm({
+        leaveType: 'CASUAL_LEAVE',
+        fromDate: '',
+        toDate: '',
+        substituteFacultyName: '',
+        reason: ''
+      });
+      fetchLeaves();
+    } catch (err) {
+      addToast(err.response?.data?.message || 'Failed to submit leave request', 'error');
+    } finally {
+      setSubmittingLeave(false);
+    }
+  };
+
+  const handleUploadTimetable = async (e) => {
+    e.preventDefault();
+    if (!ttFile && !ttText.trim()) {
+      addToast('Please choose a timetable file or enter timetable text', 'warning');
+      return;
+    }
+    setUploadingTt(true);
+    try {
+      let res;
+      if (ttFile) {
+        const formData = new FormData();
+        formData.append('file', ttFile);
+        if (ttText) formData.append('textOverride', ttText);
+        formData.append('isClassTimetable', ttIsClass);
+        if (ttSection) formData.append('section', ttSection);
+        res = await api.post('/faculty/timetable/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      } else {
+        res = await api.post('/faculty/timetable/upload', {
+          textOverride: ttText,
+          isClassTimetable: ttIsClass,
+          section: ttSection
+        });
+      }
+      setTtUploadResult(res.data);
+      addToast(`Timetable processed: ${res.data.entriesCount || 0} period(s) synced!`, 'success');
+      fetchMyTimetable();
+      if (selectedSectionId) fetchSectionTimetable(selectedSectionId);
+    } catch (err) {
+      addToast(err.response?.data?.error || 'Failed to upload timetable', 'error');
+    } finally {
+      setUploadingTt(false);
+    }
+  };
+
+  const handleQuickAttendance = async () => {
+    if (!selectedSectionId) {
+      addToast('Please select a mentor section first', 'warning');
+      return;
+    }
+    const absentIds = Object.keys(absentMap).filter(k => absentMap[k]).map(Number);
+    setSubmittingAttendance(true);
+    try {
+      const res = await api.post('/faculty/attendance/quick-mark', {
+        sectionId: selectedSectionId,
+        date: attendanceDate,
+        absentStudentIds: absentIds,
+        remarks: attendanceRemarks || `Marked via Faculty Portal for ${attendanceDate}`
+      });
+      addToast(`Attendance recorded: ${res.data.absentMarked} absent, ${res.data.presentMarked} present.`, 'success');
+      setAbsentMap({});
+      fetchFacultyData();
+    } catch (err) {
+      addToast(err.response?.data?.message || 'Failed to record attendance', 'error');
+    } finally {
+      setSubmittingAttendance(false);
+    }
+  };
+
+  const fetchDeptEvents = async () => {
+    setLoadingDeptEvents(true);
+    try {
+      const res = await api.get('/faculty/events');
+      setDeptEvents(res.data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingDeptEvents(false);
+    }
+  };
+
   const fetchFacultyData = async () => {
     try {
       const res = await api.get('/faculty/dashboard');
@@ -151,6 +286,8 @@ export const FacultyPortal = () => {
     fetchComplaints();
     fetchMyTimetable();
     fetchMentorSections();
+    fetchLeaves();
+    fetchDeptEvents();
   }, []);
 
   const handleSaveSectionPeriod = async (e) => {
@@ -1032,6 +1169,371 @@ export const FacultyPortal = () => {
                   )}
                 </CardBody>
               </Card>
+            </div>
+          ) : activeTab === 'leaveRequests' ? (
+            /* ================= MY LEAVE TO HOD VIEW ================= */
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-[var(--color-foreground)]">
+                    Faculty Leave & Permission Requests
+                  </h2>
+                  <p className="text-xs text-[var(--color-muted-foreground)]">
+                    Submit requests directly to Department HOD with substitute faculty assignment
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Apply Form */}
+                <Card>
+                  <CardHeader title="Apply for Leave / Permission" subtitle="Routed to Department HOD" />
+                  <CardBody>
+                    <form onSubmit={handleApplyLeave} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-[var(--color-foreground)] mb-1">Leave Type</label>
+                        <select
+                          value={leaveForm.leaveType}
+                          onChange={(e) => setLeaveForm({ ...leaveForm, leaveType: e.target.value })}
+                          className="w-full text-xs p-2.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)]"
+                        >
+                          <option value="CASUAL_LEAVE">Casual Leave</option>
+                          <option value="ON_DUTY">On-Duty (Conference / Official)</option>
+                          <option value="MEDICAL_LEAVE">Medical Leave</option>
+                          <option value="PERMISSION">Short Permission (1-2 Hours)</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-xs font-semibold text-[var(--color-foreground)] mb-1">From Date</label>
+                          <input
+                            type="date"
+                            value={leaveForm.fromDate}
+                            onChange={(e) => setLeaveForm({ ...leaveForm, fromDate: e.target.value })}
+                            required
+                            className="w-full text-xs p-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)]"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-[var(--color-foreground)] mb-1">To Date</label>
+                          <input
+                            type="date"
+                            value={leaveForm.toDate}
+                            onChange={(e) => setLeaveForm({ ...leaveForm, toDate: e.target.value })}
+                            required
+                            className="w-full text-xs p-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)]"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-[var(--color-foreground)] mb-1">Substitute Faculty (Optional)</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. Prof. R. Anand"
+                          value={leaveForm.substituteFacultyName}
+                          onChange={(e) => setLeaveForm({ ...leaveForm, substituteFacultyName: e.target.value })}
+                          className="w-full text-xs p-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)]"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-[var(--color-foreground)] mb-1">Reason for Leave</label>
+                        <textarea
+                          rows={3}
+                          placeholder="State clear purpose of leave..."
+                          value={leaveForm.reason}
+                          onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })}
+                          required
+                          className="w-full text-xs p-2.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)]"
+                        />
+                      </div>
+
+                      <Button type="submit" loading={submittingLeave} className="w-full">
+                        Submit Request to HOD
+                      </Button>
+                    </form>
+                  </CardBody>
+                </Card>
+
+                {/* Leaves Table */}
+                <div className="lg:col-span-2">
+                  <Card>
+                    <CardHeader
+                      title={`My Leave History (${myLeaves.length})`}
+                      subtitle="Status tracking of requests submitted to HOD"
+                      action={<Button size="sm" variant="ghost" onClick={fetchLeaves} loading={loadingLeaves}>Refresh</Button>}
+                    />
+                    <CardBody className="p-0">
+                      {myLeaves.length === 0 ? (
+                        <div className="p-8 text-center text-xs text-[var(--color-muted-foreground)]">
+                          No leave or permission requests filed yet.
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-xs text-left">
+                            <thead className="bg-[var(--color-border)]/20 border-y border-[var(--color-border)] text-[var(--color-muted-foreground)]">
+                              <tr>
+                                <th className="py-2.5 px-4 font-semibold">Type</th>
+                                <th className="py-2.5 px-4 font-semibold">Duration</th>
+                                <th className="py-2.5 px-4 font-semibold">Substitute</th>
+                                <th className="py-2.5 px-4 font-semibold">Reason</th>
+                                <th className="py-2.5 px-4 font-semibold">Status</th>
+                                <th className="py-2.5 px-4 font-semibold">HOD Notes</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-[var(--color-border)]/50">
+                              {myLeaves.map(l => (
+                                <tr key={l.id} className="hover:bg-[var(--color-border)]/10">
+                                  <td className="py-2.5 px-4 font-medium">{l.leaveType}</td>
+                                  <td className="py-2.5 px-4 font-mono">{l.fromDate} to {l.toDate}</td>
+                                  <td className="py-2.5 px-4">{l.substituteFacultyName || '—'}</td>
+                                  <td className="py-2.5 px-4 max-w-xs truncate" title={l.reason}>{l.reason}</td>
+                                  <td className="py-2.5 px-4">
+                                    <Badge variant={l.status === 'APPROVED' ? 'success' : l.status === 'REJECTED' ? 'danger' : 'warning'} size="sm">
+                                      {l.status}
+                                    </Badge>
+                                  </td>
+                                  <td className="py-2.5 px-4 text-[var(--color-muted-foreground)]">{l.resolutionNotes || '—'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </CardBody>
+                  </Card>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === 'uploadTimetable' ? (
+            /* ================= UPLOAD TIMETABLE VIEW ================= */
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-[var(--color-foreground)]">
+                    Upload Timetable (AI Extraction)
+                  </h2>
+                  <p className="text-xs text-[var(--color-muted-foreground)]">
+                    Upload an individual staff timetable or class timetable (PDF or Image) to automatically extract and register schedule periods
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <Card>
+                  <CardHeader title="Upload File or Text" subtitle="Supported formats: PDF, PNG, JPG" />
+                  <CardBody>
+                    <form onSubmit={handleUploadTimetable} className="space-y-4">
+                      <div className="border-2 border-dashed border-[var(--color-border)] rounded-xl p-6 text-center hover:border-[var(--color-primary)]">
+                        <FileUp className="w-10 h-10 text-[var(--color-muted-foreground)] mx-auto mb-2" />
+                        <p className="text-xs font-semibold text-[var(--color-foreground)]">
+                          {ttFile ? ttFile.name : 'Choose timetable PDF or image file'}
+                        </p>
+                        <input
+                          type="file"
+                          accept=".pdf,image/*,.txt"
+                          onChange={(e) => setTtFile(e.target.files[0] || null)}
+                          className="mt-3 text-xs"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-4 p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)]">
+                        <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold">
+                          <input
+                            type="checkbox"
+                            checked={ttIsClass}
+                            onChange={(e) => setTtIsClass(e.target.checked)}
+                            className="rounded border-[var(--color-border)] text-[var(--color-primary)]"
+                          />
+                          <span>This is a Class Section Timetable (Mentor Upload)</span>
+                        </label>
+                      </div>
+
+                      {ttIsClass && (
+                        <div>
+                          <label className="block text-xs font-semibold mb-1">Target Section</label>
+                          <select
+                            value={ttSection}
+                            onChange={(e) => setTtSection(e.target.value)}
+                            className="w-full text-xs p-2 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)]"
+                          >
+                            <option value="A">Section A</option>
+                            <option value="B">Section B</option>
+                            <option value="C">Section C</option>
+                            <option value="D">Section D</option>
+                          </select>
+                        </div>
+                      )}
+
+                      <div>
+                        <label className="block text-xs font-semibold mb-1">Or Paste Timetable Text / Raw OCR</label>
+                        <textarea
+                          rows={4}
+                          placeholder="e.g. Day: Monday | 09:00 AM - 10:00 AM | CS301 | Data Structures | Room CS-101..."
+                          value={ttText}
+                          onChange={(e) => setTtText(e.target.value)}
+                          className="w-full text-xs p-2.5 rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)]"
+                        />
+                      </div>
+
+                      <Button type="submit" loading={uploadingTt} className="w-full" icon={UploadCloud}>
+                        {uploadingTt ? 'Extracting & Syncing...' : 'Upload & Sync Schedule'}
+                      </Button>
+                    </form>
+                  </CardBody>
+                </Card>
+
+                <div>
+                  <Card>
+                    <CardHeader title="Extraction Results" subtitle="Parsed periods synchronized with database" />
+                    <CardBody>
+                      {ttUploadResult ? (
+                        <div className="space-y-3">
+                          <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-800 dark:text-emerald-300">
+                            <p className="font-bold">{ttUploadResult.message || 'Timetable uploaded successfully!'}</p>
+                            <p className="mt-1">Periods Synced: <strong>{ttUploadResult.entriesCount || 0}</strong></p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="p-8 text-center text-xs text-[var(--color-muted-foreground)]">
+                          Upload a timetable file or enter text to preview extraction.
+                        </div>
+                      )}
+                    </CardBody>
+                  </Card>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === 'quickAttendance' ? (
+            /* ================= QUICK ATTENDANCE VIEW ================= */
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-bold text-[var(--color-foreground)]">
+                    Quick Mark Attendance
+                  </h2>
+                  <p className="text-xs text-[var(--color-muted-foreground)]">
+                    Quickly mark absent students for today's date for your mentored section
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="date"
+                    value={attendanceDate}
+                    onChange={(e) => setAttendanceDate(e.target.value)}
+                    className="px-3 py-1.5 text-xs rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-[var(--color-foreground)] font-mono"
+                  />
+                  <Button size="sm" onClick={handleQuickAttendance} loading={submittingAttendance}>
+                    Save Today's Attendance
+                  </Button>
+                </div>
+              </div>
+
+              <Card>
+                <CardHeader
+                  title={`Student Roster — Section ${assignedSec || 'Assigned'}`}
+                  subtitle="Check the box next to students who are ABSENT today. Unchecked students are marked PRESENT."
+                />
+                <CardBody className="p-0">
+                  {mentees.length === 0 ? (
+                    <div className="p-8 text-center text-xs text-[var(--color-muted-foreground)]">
+                      No mentees enrolled in your section yet.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-[var(--color-border)]/20 border-y border-[var(--color-border)] text-[var(--color-muted-foreground)]">
+                          <tr>
+                            <th className="py-2.5 px-4 font-semibold">Mark Absent</th>
+                            <th className="py-2.5 px-4 font-semibold">Roll Number</th>
+                            <th className="py-2.5 px-4 font-semibold">Student Name</th>
+                            <th className="py-2.5 px-4 font-semibold">Current Attendance Rate</th>
+                            <th className="py-2.5 px-4 font-semibold">Status Today</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-[var(--color-border)]/50">
+                          {mentees.map(m => {
+                            const isAbsent = Boolean(absentMap[m.id]);
+                            return (
+                              <tr key={m.id} className={isAbsent ? 'bg-red-500/5' : 'hover:bg-[var(--color-border)]/10'}>
+                                <td className="py-3 px-4">
+                                  <input
+                                    type="checkbox"
+                                    checked={isAbsent}
+                                    onChange={(e) => setAbsentMap({ ...absentMap, [m.id]: e.target.checked })}
+                                    className="rounded border-[var(--color-border)] text-red-600 focus:ring-red-500 w-4 h-4 cursor-pointer"
+                                  />
+                                </td>
+                                <td className="py-3 px-4 font-mono font-bold text-[var(--color-primary)]">
+                                  {m.rollNumber}
+                                </td>
+                                <td className="py-3 px-4 font-semibold text-[var(--color-foreground)]">
+                                  {m.name}
+                                </td>
+                                <td className="py-3 px-4 font-medium">
+                                  {m.attendance}%
+                                </td>
+                                <td className="py-3 px-4">
+                                  <Badge variant={isAbsent ? 'danger' : 'success'} size="sm">
+                                    {isAbsent ? 'ABSENT' : 'PRESENT'}
+                                  </Badge>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+            </div>
+          ) : activeTab === 'deptEvents' ? (
+            /* ================= DEPARTMENT EVENTS VIEW ================= */
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-[var(--color-foreground)]">
+                    Department & Campus Events
+                  </h2>
+                  <p className="text-xs text-[var(--color-muted-foreground)]">
+                    Events, seminars, and circulars relevant to your department
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={fetchDeptEvents} loading={loadingDeptEvents}>
+                  Refresh
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {deptEvents.length === 0 ? (
+                  <div className="col-span-full p-8 text-center text-xs text-[var(--color-muted-foreground)]">
+                    No department events scheduled at this time.
+                  </div>
+                ) : (
+                  deptEvents.map(e => (
+                    <Card key={e.id}>
+                      <CardHeader
+                        title={e.title}
+                        subtitle={e.eventDate ? `Date: ${e.eventDate}` : 'Scheduled Event'}
+                      />
+                      <CardBody className="space-y-2 text-xs">
+                        <p className="text-[var(--color-muted-foreground)]">{e.description}</p>
+                        <div className="pt-2 flex items-center justify-between text-[11px] border-t border-[var(--color-border)]">
+                          <span className="font-semibold text-amber-600 dark:text-amber-400">
+                            📍 {e.location || 'Campus'}
+                          </span>
+                          <Badge variant="primary" size="sm">
+                            {e.targetSection ? `Sec ${e.targetSection}` : 'All Dept'}
+                          </Badge>
+                        </div>
+                      </CardBody>
+                    </Card>
+                  ))
+                )}
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
