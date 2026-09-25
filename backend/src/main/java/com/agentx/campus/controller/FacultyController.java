@@ -231,7 +231,10 @@ public class FacultyController {
 
     @PostMapping("/attendance/quick-mark")
     public ResponseEntity<?> quickMarkAttendance(Authentication auth, @RequestBody Map<String, Object> body) {
-        Long sectionId = Long.valueOf(body.get("sectionId").toString());
+        Long sectionId = null;
+        if (body.get("sectionId") != null && !body.get("sectionId").toString().isBlank()) {
+            sectionId = Long.valueOf(body.get("sectionId").toString());
+        }
         String dateStr = body.getOrDefault("date", "").toString();
         java.util.List<Long> absentStudentIds = new java.util.ArrayList<>();
         if (body.get("absentStudentIds") instanceof java.util.List<?> list) {

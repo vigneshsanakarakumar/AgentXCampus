@@ -18,45 +18,18 @@ export const StudentAssistantPage = () => {
               <Bot className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-[var(--color-foreground)] tracking-tight">
-                  AgentX Autonomous Multi-Agent Command Center
-                </h2>
-                <Badge variant="primary" size="sm">Groq Llama 3.3 70B</Badge>
-              </div>
+              <h2 className="text-base font-bold text-[var(--color-foreground)] tracking-tight">
+                AgentX Autonomous Campus Assistant
+              </h2>
               <p className="text-xs text-[var(--color-muted-foreground)] mt-1">
                 Your intelligent assistant for academic records, schedules, policy citations, maintenance tickets, and AI task planning.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 text-[10px] text-[var(--color-muted-foreground)]">
+          <div className="flex items-center gap-2 text-xs text-[var(--color-muted-foreground)]">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="font-semibold text-emerald-600 dark:text-emerald-400">5 Specialized Agents Active</span>
-          </div>
-        </div>
-
-        {/* Specialized Agents Pill Grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5 mt-4 pt-4 border-t border-[var(--color-border)]">
-          <div className="p-2 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)] text-center">
-            <p className="text-[10px] font-bold text-[var(--color-foreground)]">Academic Agent</p>
-            <p className="text-[9px] text-[var(--color-muted-foreground)]">Attendance & Grades</p>
-          </div>
-          <div className="p-2 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)] text-center">
-            <p className="text-[10px] font-bold text-[var(--color-foreground)]">Schedule Agent</p>
-            <p className="text-[9px] text-[var(--color-muted-foreground)]">Classes & Events</p>
-          </div>
-          <div className="p-2 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)] text-center">
-            <p className="text-[10px] font-bold text-[var(--color-foreground)]">Document RAG</p>
-            <p className="text-[9px] text-[var(--color-muted-foreground)]">Verified Regulations</p>
-          </div>
-          <div className="p-2 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)] text-center">
-            <p className="text-[10px] font-bold text-[var(--color-foreground)]">Task Planner</p>
-            <p className="text-[9px] text-[var(--color-muted-foreground)]">Auto Study Tasks</p>
-          </div>
-          <div className="p-2 rounded-lg bg-[var(--color-card)] border border-[var(--color-border)] text-center">
-            <p className="text-[10px] font-bold text-[var(--color-foreground)]">Support Agent</p>
-            <p className="text-[9px] text-[var(--color-muted-foreground)]">Auto Ticket Filing</p>
+            <span className="font-semibold text-emerald-600 dark:text-emerald-400">Assistant Online</span>
           </div>
         </div>
       </div>

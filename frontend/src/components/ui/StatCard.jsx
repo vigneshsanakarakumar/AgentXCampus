@@ -1,8 +1,8 @@
 import React from 'react';
 import Card, { CardBody } from './Card';
 
-export const StatCard = ({ title, value, subtitle, icon: Icon, badge, className = '' }) => (
-  <Card hover className={`relative overflow-hidden ${className}`}>
+export const StatCard = ({ title, value, subtitle, icon: Icon, badge, className = '', onClick }) => (
+  <Card hover className={`relative overflow-hidden ${onClick ? 'cursor-pointer transition-transform hover:-translate-y-0.5' : ''} ${className}`} onClick={onClick}>
     <CardBody className="p-5">
       <div className="flex items-start justify-between">
         <div>

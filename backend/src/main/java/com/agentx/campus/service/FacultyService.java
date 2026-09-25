@@ -513,8 +513,28 @@ public class FacultyService {
                                                    List<Long> absentStudentIds, String remarks) {
         User faculty = userRepository.findByUsername(facultyUsername)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + facultyUsername));
-        FacultyMentorSection section = facultyMentorSectionRepository.findById(sectionId)
-                .orElseThrow(() -> new IllegalArgumentException("Mentor section not found: " + sectionId));
+        FacultyMentorSection section = null;
+        if (sectionId != null) {
+            section = facultyMentorSectionRepository.findById(sectionId).orElse(null);
+        }
+        if (section == null) {
+            List<FacultyMentorSection> list = facultyMentorSectionRepository.findByFacultyProfile_User_Username(facultyUsername);
+            if (!list.isEmpty()) {
+                section = list.get(0);
+            }
+        }
+        if (section == null) {
+            FacultyProfile fp = facultyProfileRepository.findByUser(faculty).orElse(null);
+            if (fp != null && fp.getAssignedDepartment() != null && fp.getAssignedSection() != null) {
+                List<FacultyMentorSection> list = facultyMentorSectionRepository.findByDepartmentAndSection(fp.getAssignedDepartment(), fp.getAssignedSection());
+                if (!list.isEmpty()) {
+                    section = list.get(0);
+                }
+            }
+        }
+        if (section == null) {
+            throw new IllegalArgumentException("No mentor section assigned to faculty " + facultyUsername);
+        }
 
         LocalDate date = dateStr != null && !dateStr.isBlank() ? LocalDate.parse(dateStr) : LocalDate.now();
         List<StudentProfile> students = studentProfileRepository.findByDepartmentAndSection(section.getDepartment(), section.getSection());

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import api from '../services/api';
@@ -15,7 +15,7 @@ import AgentXAssistant from '../components/ui/AgentXAssistant';
 import {
   BookOpen, Users, Plus, Trash2, Calendar, Clock, MapPin, GraduationCap,
   CheckCircle, ArrowRight, AlertCircle, Wrench, CheckCircle2, MessageSquare,
-  AlertTriangle, Edit2, ShieldAlert
+  AlertTriangle, Edit2, ShieldAlert, FileUp, UploadCloud, Bell, FileText, CheckSquare
 } from 'lucide-react';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -23,7 +23,23 @@ const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'
 export const FacultyPortal = () => {
   const { user } = useAuth();
   const { addToast } = useToast();
-  const [activeTab, setActiveTab] = useState('overview');
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') || 'overview';
+  const [activeTab, setActiveTabState] = useState(initialTab);
+
+  const setActiveTab = (tab) => {
+    setActiveTabState(tab);
+    setSearchParams(tab === 'overview' ? {} : { tab });
+  };
+
+  useEffect(() => {
+    const tabFromUrl = searchParams.get('tab') || 'overview';
+    if (tabFromUrl !== activeTab) {
+      setActiveTabState(tabFromUrl);
+    }
+  }, [searchParams]);
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -183,15 +199,16 @@ export const FacultyPortal = () => {
   };
 
   const handleQuickAttendance = async () => {
-    if (!selectedSectionId) {
-      addToast('Please select a mentor section first', 'warning');
-      return;
+    let secId = selectedSectionId;
+    if (!secId && mentorSections.length > 0) {
+      secId = mentorSections[0].id;
+      setSelectedSectionId(secId);
     }
     const absentIds = Object.keys(absentMap).filter(k => absentMap[k]).map(Number);
     setSubmittingAttendance(true);
     try {
       const res = await api.post('/faculty/attendance/quick-mark', {
-        sectionId: selectedSectionId,
+        sectionId: secId || undefined,
         date: attendanceDate,
         absentStudentIds: absentIds,
         remarks: attendanceRemarks || `Marked via Faculty Portal for ${attendanceDate}`
@@ -200,7 +217,7 @@ export const FacultyPortal = () => {
       setAbsentMap({});
       fetchFacultyData();
     } catch (err) {
-      addToast(err.response?.data?.message || 'Failed to record attendance', 'error');
+      addToast(err.response?.data?.message || err.response?.data?.error || 'Failed to record attendance', 'error');
     } finally {
       setSubmittingAttendance(false);
     }
@@ -533,20 +550,18 @@ export const FacultyPortal = () => {
               value={'' + mentees.length}
               subtitle={assignedSec ? `Enrolled in Section ${assignedSec}` : 'Unassigned'}
               icon={Users}
-              badge={<Badge variant={mentees.length > 0 ? 'success' : 'neutral'}>{mentees.length > 0 ? 'Active Roster' : 'Empty'}</Badge>}
+              onClick={() => assignedDept && assignedSec ? navigate('/faculty/class') : setActiveTab('mentorClass')}
+              badge={<Badge variant={mentees.length > 0 ? 'success' : 'neutral'}>{mentees.length > 0 ? 'View Class Roster →' : 'Empty'}</Badge>}
             />
             <StatCard
               title="My Teaching Lectures"
               value={'' + myTimetable.length}
               subtitle="Personal lectures across sections"
               icon={Clock}
+              onClick={() => setActiveTab('myTimetable')}
               badge={
-                <Badge
-                  variant="primary"
-                  className="cursor-pointer"
-                  onClick={() => setActiveTab('myTimetable')}
-                >
-                  My Schedule
+                <Badge variant="primary">
+                  View My Schedule →
                 </Badge>
               }
             />
@@ -555,13 +570,10 @@ export const FacultyPortal = () => {
               value={'' + (sectionTimetable.length || timetables.length)}
               subtitle={assignedSec ? `Section ${assignedSec} weekly schedule` : 'Section Schedule'}
               icon={BookOpen}
+              onClick={() => setActiveTab('sectionTimetable')}
               badge={
-                <Badge
-                  variant="info"
-                  className="cursor-pointer"
-                  onClick={() => setActiveTab('sectionTimetable')}
-                >
-                  Edit Timetable
+                <Badge variant="info">
+                  Edit Section Timetable →
                 </Badge>
               }
             />
@@ -570,13 +582,10 @@ export const FacultyPortal = () => {
               value={'' + complaints.filter(c => c.status !== 'RESOLVED' && c.routedTo === 'FACULTY_MENTOR').length}
               subtitle="Pending review as Mentor"
               icon={AlertCircle}
+              onClick={() => setActiveTab('complaints')}
               badge={
-                <Badge
-                  variant={complaints.filter(c => c.status !== 'RESOLVED').length > 0 ? 'warning' : 'success'}
-                  className="cursor-pointer"
-                  onClick={() => setActiveTab('complaints')}
-                >
-                  {complaints.filter(c => c.status !== 'RESOLVED').length > 0 ? 'Action Needed' : 'All Resolved'}
+                <Badge variant={complaints.filter(c => c.status !== 'RESOLVED').length > 0 ? 'warning' : 'success'}>
+                  {complaints.filter(c => c.status !== 'RESOLVED').length > 0 ? 'Review Grievances →' : 'All Resolved'}
                 </Badge>
               }
             />
@@ -1535,8 +1544,131 @@ export const FacultyPortal = () => {
                 )}
               </div>
             </div>
+          ) : activeTab === 'announcements' ? (
+            /* ================= ANNOUNCEMENTS VIEW ================= */
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-[var(--color-foreground)]">
+                    Department & Campus Announcements
+                  </h2>
+                  <p className="text-xs text-[var(--color-muted-foreground)]">
+                    Official notices, HOD circulars, academic schedules, and institutional broadcasts
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={fetchFacultyData} icon={Bell}>
+                  Refresh Notices
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                {(!data?.announcements || data.announcements.length === 0) ? (
+                  <Card>
+                    <CardBody className="p-8 text-center text-xs text-[var(--color-muted-foreground)]">
+                      <Bell className="w-8 h-8 mx-auto mb-2 text-stone-400 opacity-60" />
+                      <p className="font-semibold text-[var(--color-foreground)]">No Announcements Posted</p>
+                      <p className="mt-1">Department circulars and administrative broadcasts will appear here.</p>
+                    </CardBody>
+                  </Card>
+                ) : (
+                  data.announcements.map((a) => (
+                    <Card key={a.id} hover>
+                      <CardBody className="p-4 space-y-2">
+                        <div className="flex items-start justify-between gap-4">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h3 className="text-sm font-bold text-[var(--color-foreground)]">{a.title}</h3>
+                              {a.category && (
+                                <Badge variant="primary" size="sm">{a.category}</Badge>
+                              )}
+                              {a.targetDepartment && (
+                                <Badge variant="neutral" size="sm">{a.targetDepartment}</Badge>
+                              )}
+                              {a.targetSection && (
+                                <Badge variant="warning" size="sm">Sec {a.targetSection}</Badge>
+                              )}
+                            </div>
+                            <p className="text-xs text-[var(--color-muted-foreground)] mt-1 whitespace-pre-line leading-relaxed">
+                              {a.content}
+                            </p>
+                          </div>
+                          {a.createdAt && (
+                            <span className="text-[10px] text-[var(--color-muted-foreground)] whitespace-nowrap font-mono">
+                              {new Date(a.createdAt).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      </CardBody>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="space-y-6">
+              {/* Quick Operations & Tools Grid */}
+              <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] shadow-sm">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--color-muted-foreground)] mb-3">
+                  Quick Faculty Operations & Tools
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                  <button
+                    onClick={() => setActiveTab('quickAttendance')}
+                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 text-left transition-all group"
+                  >
+                    <CheckSquare className="w-5 h-5 text-emerald-500 mb-2 group-hover:scale-110 transition-transform" />
+                    <p className="text-xs font-bold text-[var(--color-foreground)]">Mark Attendance</p>
+                    <p className="text-[10px] text-[var(--color-muted-foreground)]">Daily section roll call</p>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('uploadTimetable')}
+                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 text-left transition-all group"
+                  >
+                    <UploadCloud className="w-5 h-5 text-indigo-500 mb-2 group-hover:scale-110 transition-transform" />
+                    <p className="text-xs font-bold text-[var(--color-foreground)]">Upload Timetable</p>
+                    <p className="text-[10px] text-[var(--color-muted-foreground)]">AI OCR extraction</p>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('sectionTimetable')}
+                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 text-left transition-all group"
+                  >
+                    <BookOpen className="w-5 h-5 text-sky-500 mb-2 group-hover:scale-110 transition-transform" />
+                    <p className="text-xs font-bold text-[var(--color-foreground)]">Section Timetable</p>
+                    <p className="text-[10px] text-[var(--color-muted-foreground)]">Class periods & labs</p>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('myTimetable')}
+                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 text-left transition-all group"
+                  >
+                    <Clock className="w-5 h-5 text-amber-500 mb-2 group-hover:scale-110 transition-transform" />
+                    <p className="text-xs font-bold text-[var(--color-foreground)]">Teaching Schedule</p>
+                    <p className="text-[10px] text-[var(--color-muted-foreground)]">My assigned lectures</p>
+                  </button>
+
+                  <button
+                    onClick={() => setActiveTab('leaveRequests')}
+                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 text-left transition-all group"
+                  >
+                    <FileText className="w-5 h-5 text-violet-500 mb-2 group-hover:scale-110 transition-transform" />
+                    <p className="text-xs font-bold text-[var(--color-foreground)]">Leave to HOD</p>
+                    <p className="text-[10px] text-[var(--color-muted-foreground)]">Request leave / sub</p>
+                  </button>
+
+                  <button
+                    onClick={() => navigate('/faculty/class')}
+                    className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 text-left transition-all group"
+                  >
+                    <Users className="w-5 h-5 text-pink-500 mb-2 group-hover:scale-110 transition-transform" />
+                    <p className="text-xs font-bold text-[var(--color-foreground)]">Mentor Class</p>
+                    <p className="text-[10px] text-[var(--color-muted-foreground)]">Student coursework</p>
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2 space-y-6">
 
                 {/* Section Timetable Management */}
@@ -1730,7 +1862,8 @@ export const FacultyPortal = () => {
                 <AgentXAssistant onActionCompleted={() => fetchFacultyData()} />
               </div>
             </div>
-          )}
+          </div>
+        )}
         </main>
       </div>
     </div>

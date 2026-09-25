@@ -10,7 +10,7 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
   const [messages, setMessages] = useState([
     {
       sender: 'agent',
-      text: "Hello! I am your AgentX Campus Orchestrator. I coordinate specialized agents for Academics, Schedules, Knowledge Base (Semantic Vector RAG), and General AI Copilot.\n\nTry asking me about attendance condonation rules, hostel Saturday outing guidelines, your class timetable, or general coding questions!",
+      text: "Hello! I am your AgentX Campus AI Assistant. How can I help you today?\n\nTry asking me about attendance regulations, hostel guidelines, class timetables, or campus inquiries!",
       steps: [],
     }
   ]);
@@ -34,7 +34,7 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
     setMessages((prev) => [...prev, userMessage]);
     setQuery('');
     setLoading(true);
-    setCurrentStep('Orchestrator Agent: Analyzing user intent & selecting specialized agent...');
+    setCurrentStep('AgentX Assistant: Analyzing query and retrieving information...');
 
     const token = localStorage.getItem('token');
     let accumulatedText = '';
@@ -204,13 +204,12 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
   return (
     <Card className="flex flex-col h-[620px] shadow-sm">
       <CardHeader
-        title="AgentX Autonomous Assistant"
-        subtitle="Central Orchestrator • Semantic Vector RAG, Academic, Schedule & General AI"
+        title="AgentX Assistant"
         action={
-          <Badge variant="primary" size="sm">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
-            Token Streaming Active
-          </Badge>
+          <div className="flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Assistant Ready</span>
+          </div>
         }
       />
 

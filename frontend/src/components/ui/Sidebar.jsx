@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import {
   LayoutDashboard,
@@ -20,6 +20,8 @@ import {
 
 export const Sidebar = ({ activeTab, onTabChange }) => {
   const { role } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const studentLinks = [
     { id: 'overview', label: 'Overview', icon: LayoutDashboard, to: '/dashboard' },
@@ -31,7 +33,7 @@ export const Sidebar = ({ activeTab, onTabChange }) => {
   ];
 
   const facultyLinks = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard, to: '/faculty/dashboard' },
+    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
     { id: 'myTimetable', label: 'My Teaching Schedule', icon: Clock },
     { id: 'sectionTimetable', label: 'Section Timetable Editor', icon: BookOpen },
     { id: 'uploadTimetable', label: 'Upload Timetable (AI)', icon: FileText },
@@ -112,7 +114,13 @@ export const Sidebar = ({ activeTab, onTabChange }) => {
             return (
               <button
                 key={item.id}
-                onClick={() => onTabChange && onTabChange(item.id)}
+                onClick={() => {
+                  if (role === 'FACULTY' && location.pathname !== '/faculty/dashboard') {
+                    navigate(`/faculty/dashboard?tab=${item.id}`);
+                  } else if (onTabChange) {
+                    onTabChange(item.id);
+                  }
+                }}
                 className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
                   isActive
                     ? 'bg-[var(--color-primary)] text-white shadow-sm'
