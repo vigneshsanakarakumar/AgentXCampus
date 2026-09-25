@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # MySQL 8.0 Primary Database
+  mysql:
+    image: mysql:8.0
+    container_name: agentx-mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DATABASE_PASSWORD:-root}
+      MYSQL_DATABASE: agentx_campus
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - agentx-network
+
+  # AgentX Campus Spring Boot Backend (Java 21)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: agentx-backend
+    restart: always
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: jdbc:mysql://mysql:3306/agentx_campus?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true&createDatabaseIfNotExist=true
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-root}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-root}
+      JWT_SECRET: ${JWT_SECRET:-AgentXCampusSuperSecretKeyForJwtAuthentication2026SecureHashMustBeLongAndSafe}
+      GROQ_API_KEY: ${GROQ_API_KEY}
+      GROQ_MODEL: ${GROQ_MODEL:-llama-3.3-70b-versatile}
+      RAG_PROVIDER: ${RAG_PROVIDER:-auto}
+      RAGFLOW_ENABLED: ${RAGFLOW_ENABLED:-false}
+      RAGFLOW_BASE_URL: ${RAGFLOW_BASE_URL:-http://ragflow:9380}
+      RAGFLOW_API_KEY: ${RAGFLOW_API_KEY:-}
+      RAGFLOW_DATASET_ID: ${RAGFLOW_DATASET_ID:-}
+    ports:
+      - "8080:8080"
+    networks:
+      - agentx-network
+
+  # AgentX Campus React 19 / Vite Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: agentx-frontend
+    restart: always
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+    networks:
+      - agentx-network
+
+  # Infiniflow RAGFlow External Knowledge Engine
+  # Pinned stable release v0.16.0
+  # Note: To run the full multi-node RAGFlow cluster (Infinity + Redis + MinIO), see docker-compose.ragflow.yml
+  ragflow:
+    image: infiniflow/ragflow:v0.16.0
+    container_name: agentx-ragflow
+    restart: unless-stopped
+    ports:
+      - "9380:9380"
+    environment:
+      - DOC_ENGINE=infinity
+    volumes:
+      - ragflow_data:/ragflow/data
+    networks:
+      - agentx-network
+
+networks:
+  agentx-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  ragflow_data:

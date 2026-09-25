@@ -1272,7 +1272,41 @@ public class DataInitializer implements CommandLineRunner {
                 "Career Development Centre", "PDF", "3.2", "Placement Director"
         );
 
-        campusDocumentRepository.saveAll(List.of(doc1, doc2, doc3, doc4));
-        System.out.println("[DataInitializer] Seeded RAG knowledge base documents (4 institutional documents with exact citations)");
+        CampusDocument doc5 = new CampusDocument(
+                "Student On-Duty (OD) & Leave Application Regulations 2026",
+                "REGULATION",
+                "Statutory rules for official On-Duty permissions, hackathon representations, and medical leave filings.",
+                "1. ON-DUTY (OD) PERMISSION CRITERIA:\n"
+                        + "Students representing the institution in external technical symposiums, hackathons, sports tournaments, and authorized collegiate conferences must submit an OD application at least 48 hours prior to the event.\n\n"
+                        + "A maximum of 12 days per semester is sanctioned for technical and co-curricular representations. All approved OD hours are credited into the student attendance register as 'OD' and counted as attended classes towards end-semester examination eligibility.\n\n"
+                        + "2. MEDICAL LEAVE CERTIFICATION:\n"
+                        + "Absence on medical grounds exceeding 3 consecutive days mandates submission of a signed government/authorized medical practitioner fitness certificate to the department office within 3 working days of resumption of classes.",
+                "Academic Affairs & Student Welfare", "PDF", "2026.1", "Dean of Student Affairs"
+        );
+
+        CampusDocument doc6 = new CampusDocument(
+                "Campus Bus Transport & Commuter Regulations 2026",
+                "CAMPUS_GUIDE",
+                "Guidelines governing college bus routes, boarding passes, departure timings, and commuter safety.",
+                "1. BUS ROUTE TIMINGS & BOARDING:\n"
+                        + "College transit buses depart from terminating city points between 07:30 AM and 07:50 AM to arrive at the campus gates by 08:35 AM. Evening return buses depart sharp at 05:00 PM from the main campus bus terminus.\n\n"
+                        + "2. TRANSPORT PASS IDENTIFICATION:\n"
+                        + "All day scholar students availing institutional transport must display their physical or digital QR transport pass to the transit marshal upon boarding. Unauthorized travel attracts an administrative penalty.",
+                "Transport Department", "PDF", "1.2", "Transport Officer"
+        );
+
+        CampusDocument doc7 = new CampusDocument(
+                "Student Grievance Redressal & Anti-Ragging Statutory Guidelines",
+                "POLICY",
+                "Institutional mechanisms for reporting infrastructure, academic, harassment, or hostel grievances.",
+                "1. GRIEVANCE REDRESSAL MECHANISM:\n"
+                        + "Students may register academic, infrastructure, or hostel grievances via the AgentX Student Portal. Standard turnaround time (TAT) is 24 hours for emergency maintenance and 72 hours for academic appeals.\n\n"
+                        + "2. ZERO-TOLERANCE ANTI-RAGGING POLICY:\n"
+                        + "In compliance with UGC and statutory regulatory mandates, the campus enforces zero tolerance towards ragging or intimidation. Violations lead to immediate suspension and criminal reporting to civil authorities.",
+                "Internal Complaints Committee", "PDF", "2026.1", "Chairperson, ICC"
+        );
+
+        campusDocumentRepository.saveAll(List.of(doc1, doc2, doc3, doc4, doc5, doc6, doc7));
+        System.out.println("[DataInitializer] Seeded RAG knowledge base documents (7 statutory institutional documents with exact citations)");
     }
 }

@@ -4,10 +4,13 @@ import com.agentx.campus.dto.*;
 import com.agentx.campus.model.*;
 import com.agentx.campus.service.AdminService;
 import com.agentx.campus.service.RequestService;
+import com.agentx.campus.service.RagService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -16,10 +19,12 @@ public class AdminController {
 
     private final AdminService adminService;
     private final RequestService requestService;
+    private final RagService ragService;
 
-    public AdminController(AdminService adminService, RequestService requestService) {
+    public AdminController(AdminService adminService, RequestService requestService, RagService ragService) {
         this.adminService = adminService;
         this.requestService = requestService;
+        this.ragService = ragService;
     }
 
     @GetMapping("/dashboard")
@@ -239,5 +244,57 @@ public class AdminController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    // ─── RAG & RAGFlow Enterprise Knowledge Base Management ─────────────────
+
+    @GetMapping("/rag/status")
+    public ResponseEntity<?> getRagStatus() {
+        return ResponseEntity.ok(ragService.getStatus());
+    }
+
+    @GetMapping("/rag/documents")
+    public ResponseEntity<?> getRagDocuments() {
+        return ResponseEntity.ok(ragService.listDocuments());
+    }
+
+    @PostMapping("/rag/upload")
+    public ResponseEntity<?> uploadRagDocument(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "category", required = false) String category,
+            @RequestParam(value = "department", required = false) String department,
+            @RequestParam(value = "version", required = false) String version) {
+        try {
+            if (file == null || file.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Uploaded file is empty"));
+            }
+            String filename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "document.txt";
+            String docTitle = (title != null && !title.isBlank()) ? title : filename;
+            Map<String, Object> metadata = new HashMap<>();
+            metadata.put("title", docTitle);
+            metadata.put("category", (category != null && !category.isBlank()) ? category : "Institutional Policy");
+            metadata.put("department", (department != null && !department.isBlank()) ? department : "All");
+            metadata.put("version", (version != null && !version.isBlank()) ? version : "2026.1");
+
+            var result = ragService.uploadDocument(filename, file.getBytes(), file.getContentType(), metadata);
+            return ResponseEntity.ok(result);
+        } catch (Exception ex) {
+            return ResponseEntity.badRequest().body(Map.of("error", ex.getMessage()));
+        }
+    }
+
+    @DeleteMapping("/rag/documents/{id}")
+    public ResponseEntity<?> deleteRagDocument(@PathVariable String id) {
+        boolean deleted = ragService.deleteDocument(id);
+        return ResponseEntity.ok(Map.of("success", deleted, "id", id));
+    }
+
+    @PostMapping("/rag/query")
+    public ResponseEntity<?> testRagQuery(@RequestBody Map<String, Object> body) {
+        String query = (String) body.getOrDefault("query", "");
+        int topK = body.containsKey("topK") && body.get("topK") instanceof Number num ? num.intValue() : 3;
+        var chunks = ragService.retrieveRelevantChunks(query, topK);
+        return ResponseEntity.ok(chunks);
     }
 }

@@ -129,6 +129,11 @@ export const AdminPortal = () => {
   // Documents / RAG Knowledge Base State
   const [documentsList, setDocumentsList] = useState([]);
   const [showAddDoc, setShowAddDoc] = useState(false);
+  const [ragStatus, setRagStatus] = useState(null);
+  const [selectedDocFile, setSelectedDocFile] = useState(null);
+  const [ragTestQuery, setRagTestQuery] = useState('');
+  const [ragTestResults, setRagTestResults] = useState([]);
+  const [testingRag, setTestingRag] = useState(false);
   const [docForm, setDocForm] = useState({
     title: '',
     category: 'REGULATION',
@@ -205,6 +210,10 @@ export const AdminPortal = () => {
     try {
       const res = await api.get('/admin/documents');
       setDocumentsList(res.data);
+    } catch (err) {}
+    try {
+      const statusRes = await api.get('/admin/rag/status');
+      setRagStatus(statusRes.data);
     } catch (err) {}
   };
 
@@ -457,9 +466,22 @@ export const AdminPortal = () => {
     e.preventDefault();
     setAddingDoc(true);
     try {
-      await api.post('/admin/documents', docForm);
-      addToast('Document uploaded and indexed in RAG knowledge base!', 'success');
+      if (selectedDocFile) {
+        const formData = new FormData();
+        formData.append('file', selectedDocFile);
+        formData.append('title', docForm.title || selectedDocFile.name);
+        formData.append('category', docForm.category);
+        formData.append('department', docForm.department);
+        formData.append('version', docForm.version);
+        await api.post('/admin/rag/upload', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        });
+      } else {
+        await api.post('/admin/documents', docForm);
+      }
+      addToast('Document successfully uploaded & indexed in RAG knowledge base!', 'success');
       setShowAddDoc(false);
+      setSelectedDocFile(null);
       setDocForm({
         title: '',
         category: 'REGULATION',
@@ -472,9 +494,24 @@ export const AdminPortal = () => {
       fetchDocuments();
       fetchAdminData();
     } catch (err) {
-      addToast('Failed to upload document.', 'error');
+      addToast('Failed to upload document: ' + (err.response?.data?.error || err.message), 'error');
     } finally {
       setAddingDoc(false);
+    }
+  };
+
+  const handleTestRagQuery = async (e) => {
+    e.preventDefault();
+    if (!ragTestQuery.trim()) return;
+    setTestingRag(true);
+    try {
+      const res = await api.post('/admin/rag/query', { query: ragTestQuery, topK: 3 });
+      setRagTestResults(res.data || []);
+      addToast(`RAG Retrieval returned ${res.data?.length || 0} chunk(s)`, 'info');
+    } catch (err) {
+      addToast('RAG query test failed', 'error');
+    } finally {
+      setTestingRag(false);
     }
   };
 
@@ -1387,86 +1424,212 @@ export const AdminPortal = () => {
             </Card>
           ) : adminView === 'documents' ? (
             /* ================= RAG KNOWLEDGE BASE MANAGEMENT VIEW ================= */
-            <Card>
-              <CardHeader
-                title="Institutional Knowledge Base & RAG Index"
-                subtitle="Upload policies, regulations, and handbooks that feed the Document/RAG Agent"
-                action={
-                  <Button size="sm" icon={Plus} onClick={() => setShowAddDoc(!showAddDoc)}>
-                    Upload Document
-                  </Button>
-                }
-              />
-              <CardBody className="p-5">
-                {showAddDoc && (
-                  <form onSubmit={handleCreateDocument} className="mb-6 p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] space-y-3">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary)]">Add Knowledge Base Document</h4>
-                    <Input
-                      label="Document Title"
-                      placeholder="e.g. Autonomous Academic Regulations 2026..."
-                      value={docForm.title}
-                      onChange={(e) => setDocForm({ ...docForm, title: e.target.value })}
-                      required
-                    />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs font-medium mb-1">Category</label>
-                        <select
-                          value={docForm.category}
-                          onChange={(e) => setDocForm({ ...docForm, category: e.target.value })}
-                          className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-xs p-2"
-                        >
-                          <option value="REGULATION">Academic Regulations</option>
-                          <option value="EXAM_RULES">Examination & Assessment Rules</option>
-                          <option value="CAMPUS_GUIDE">Campus & Hostel Guide</option>
-                          <option value="POLICY">Placement & Training Policy</option>
-                          <option value="SYLLABUS">Course Syllabus</option>
-                        </select>
-                      </div>
-                      <Input
-                        label="Department"
-                        value={docForm.department}
-                        onChange={(e) => setDocForm({ ...docForm, department: e.target.value })}
-                      />
+            <div className="space-y-6">
+              {/* RAG Cluster Status Banner */}
+              <div className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-card)] flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2.5 rounded-xl ${ragStatus?.ragflowHealthy ? 'bg-emerald-500/10 text-emerald-600' : 'bg-sky-500/10 text-sky-600'}`}>
+                    <Cpu className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-bold text-[var(--color-foreground)]">Enterprise RAG Engine</h4>
+                      <Badge variant={ragStatus?.ragflowHealthy ? 'success' : 'primary'} size="sm">
+                        {ragStatus?.ragflowHealthy ? 'RAGFlow v0.16.0 Connected' : 'Embedded Semantic Vector Active'}
+                      </Badge>
                     </div>
-                    <div>
-                      <label className="block text-xs font-medium mb-1">Full Document Text / Content for RAG Indexing</label>
-                      <textarea
-                        rows={6}
-                        placeholder="Paste document text or extracted PDF paragraphs here for chunking & retrieval..."
-                        value={docForm.content}
-                        onChange={(e) => setDocForm({ ...docForm, content: e.target.value })}
-                        className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-xs p-3 text-[var(--color-foreground)] font-mono"
+                    <p className="text-xs text-[var(--color-muted-foreground)]">
+                      {ragStatus?.statusMessage || 'Hybrid institutional knowledge retrieval with dense subword vector similarity & citations'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4 text-xs font-mono text-[var(--color-muted-foreground)]">
+                  <div>
+                    <span className="text-[10px] uppercase text-[var(--color-muted-foreground)] block">Documents</span>
+                    <strong className="text-sm text-[var(--color-foreground)]">{ragStatus?.totalDocuments || documentsList.length}</strong>
+                  </div>
+                  <div className="border-l border-[var(--color-border)] pl-4">
+                    <span className="text-[10px] uppercase text-[var(--color-muted-foreground)] block">Indexed Chunks</span>
+                    <strong className="text-sm text-[var(--color-foreground)]">{ragStatus?.totalChunks || (documentsList.length * 4)}</strong>
+                  </div>
+                  <div className="border-l border-[var(--color-border)] pl-4">
+                    <span className="text-[10px] uppercase text-[var(--color-muted-foreground)] block">Active Provider</span>
+                    <strong className="text-xs text-[var(--color-primary)]">{ragStatus?.activeProvider || 'EMBEDDED'}</strong>
+                  </div>
+                </div>
+              </div>
+
+              {/* RAG Query Tester Card */}
+              <Card>
+                <CardHeader
+                  title="Test Knowledge Retrieval & Citations"
+                  subtitle="Verify retrieval scores, section chunking, and citations against the active RAG engine"
+                />
+                <CardBody className="p-4 space-y-3">
+                  <form onSubmit={handleTestRagQuery} className="flex gap-2">
+                    <Input
+                      placeholder="e.g. What is the condonation fee if attendance is 68%? or hostel visitor rules..."
+                      value={ragTestQuery}
+                      onChange={(e) => setRagTestQuery(e.target.value)}
+                      className="flex-1"
+                    />
+                    <Button type="submit" size="sm" loading={testingRag} icon={Search}>
+                      Test Retrieval
+                    </Button>
+                  </form>
+
+                  {ragTestResults.length > 0 && (
+                    <div className="space-y-2 pt-2 border-t border-[var(--color-border)]">
+                      <span className="text-xs font-semibold text-[var(--color-primary)]">
+                        Top {ragTestResults.length} Retrieved Chunk(s):
+                      </span>
+                      {ragTestResults.map((chunk, cIdx) => (
+                        <div key={cIdx} className="p-3 rounded-lg border border-[var(--color-border)] bg-[var(--color-background)] space-y-1.5 text-xs">
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Badge variant="primary" size="sm">Score: {chunk.score ? Math.round(chunk.score * 100) / 100 : 'N/A'}</Badge>
+                              <strong className="text-[var(--color-foreground)]">{chunk.documentTitle}</strong>
+                            </div>
+                            <span className="text-[10px] font-mono text-[var(--color-muted-foreground)]">
+                              Page {chunk.pageNumber} • Para {chunk.paragraphNumber} • Provider: {chunk.provider || 'RAG'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-[var(--color-muted-foreground)] bg-[var(--color-card)] p-2 rounded border border-[var(--color-border)]/60 font-mono">
+                            "{chunk.content}"
+                          </p>
+                          <div className="text-[10px] text-sky-600 dark:text-sky-400 font-mono">
+                            {chunk.citation || `📌 Source: ${chunk.documentTitle} (Page ${chunk.pageNumber})`}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardBody>
+              </Card>
+
+              {/* Document Management Card */}
+              <Card>
+                <CardHeader
+                  title="Statutory Documents & Institutional Knowledge Base"
+                  subtitle="Upload official regulations, handbooks, and policy circulars"
+                  action={
+                    <Button size="sm" icon={Plus} onClick={() => setShowAddDoc(!showAddDoc)}>
+                      Upload Document
+                    </Button>
+                  }
+                />
+                <CardBody className="p-5">
+                  {showAddDoc && (
+                    <form onSubmit={handleCreateDocument} className="mb-6 p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)] space-y-3">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--color-primary)]">Upload Institutional Document</h4>
+                      
+                      {/* File Upload Option */}
+                      <div className="p-3 border-2 border-dashed border-[var(--color-border)] rounded-xl bg-[var(--color-card)] text-center space-y-1">
+                        <input
+                          type="file"
+                          id="ragDocFile"
+                          accept=".pdf,.docx,.txt"
+                          className="hidden"
+                          onChange={(e) => {
+                            const f = e.target.files?.[0];
+                            if (f) {
+                              setSelectedDocFile(f);
+                              if (!docForm.title) setDocForm({ ...docForm, title: f.name.replace(/\.[^/.]+$/, "") });
+                            }
+                          }}
+                        />
+                        <label htmlFor="ragDocFile" className="cursor-pointer block">
+                          <FileText className="w-6 h-6 mx-auto text-[var(--color-primary)] mb-1" />
+                          <span className="text-xs font-medium text-[var(--color-foreground)]">
+                            {selectedDocFile ? selectedDocFile.name : 'Click to select PDF, DOCX, or TXT file'}
+                          </span>
+                          <span className="text-[10px] text-[var(--color-muted-foreground)] block">
+                            {selectedDocFile ? `${(selectedDocFile.size / 1024).toFixed(1)} KB selected` : 'Or paste document content manually below'}
+                          </span>
+                        </label>
+                        {selectedDocFile && (
+                          <Button size="sm" variant="ghost" onClick={() => setSelectedDocFile(null)} className="text-xs text-red-500 py-0.5">
+                            Remove File
+                          </Button>
+                        )}
+                      </div>
+
+                      <Input
+                        label="Document Title"
+                        placeholder="e.g. Autonomous Academic Regulations 2026..."
+                        value={docForm.title}
+                        onChange={(e) => setDocForm({ ...docForm, title: e.target.value })}
                         required
                       />
-                    </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                      <Button size="sm" variant="ghost" onClick={() => setShowAddDoc(false)}>Cancel</Button>
-                      <Button size="sm" type="submit" loading={addingDoc}>Save & Index</Button>
-                    </div>
-                  </form>
-                )}
-
-                <div className="space-y-3">
-                  {documentsList.map((doc) => (
-                    <div key={doc.id} className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)]/50 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Badge variant="primary" size="sm">{doc.category}</Badge>
-                          <span className="text-[10px] font-mono text-[var(--color-muted-foreground)]">Ver: {doc.version} • {doc.department}</span>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-xs font-medium mb-1">Category</label>
+                          <select
+                            value={docForm.category}
+                            onChange={(e) => setDocForm({ ...docForm, category: e.target.value })}
+                            className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-xs p-2"
+                          >
+                            <option value="REGULATION">Academic Regulations</option>
+                            <option value="EXAM_RULES">Examination & Assessment Rules</option>
+                            <option value="CAMPUS_GUIDE">Campus & Hostel Guide</option>
+                            <option value="POLICY">Placement & Training Policy</option>
+                            <option value="SYLLABUS">Course Syllabus</option>
+                          </select>
                         </div>
-                        <Button size="sm" variant="ghost" onClick={() => handleDeleteDocument(doc.id)}>
-                          <Trash2 className="w-3.5 h-3.5 text-red-500" />
-                        </Button>
+                        <Input
+                          label="Department"
+                          value={docForm.department}
+                          onChange={(e) => setDocForm({ ...docForm, department: e.target.value })}
+                        />
+                        <Input
+                          label="Version"
+                          value={docForm.version}
+                          onChange={(e) => setDocForm({ ...docForm, version: e.target.value })}
+                        />
                       </div>
-                      <h4 className="text-xs font-bold text-[var(--color-foreground)]">{doc.title}</h4>
-                      <p className="text-[11px] text-[var(--color-muted-foreground)] line-clamp-3">{doc.content}</p>
-                      <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">✓ Active in Document/RAG Agent chunk index</p>
-                    </div>
-                  ))}
-                </div>
-              </CardBody>
-            </Card>
+                      
+                      {!selectedDocFile && (
+                        <div>
+                          <label className="block text-xs font-medium mb-1">Full Document Text / Content for RAG Indexing</label>
+                          <textarea
+                            rows={6}
+                            placeholder="Paste document text or extracted paragraphs here for chunking & retrieval..."
+                            value={docForm.content}
+                            onChange={(e) => setDocForm({ ...docForm, content: e.target.value })}
+                            className="w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-card)] text-xs p-3 text-[var(--color-foreground)] font-mono"
+                            required={!selectedDocFile}
+                          />
+                        </div>
+                      )}
+                      
+                      <div className="flex justify-end gap-2 pt-2">
+                        <Button size="sm" variant="ghost" onClick={() => { setShowAddDoc(false); setSelectedDocFile(null); }}>Cancel</Button>
+                        <Button size="sm" type="submit" loading={addingDoc}>Save & Index Document</Button>
+                      </div>
+                    </form>
+                  )}
+
+                  <div className="space-y-3">
+                    {documentsList.map((doc) => (
+                      <div key={doc.id} className="p-4 rounded-xl border border-[var(--color-border)] bg-[var(--color-background)]/50 space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="primary" size="sm">{doc.category}</Badge>
+                            <span className="text-[10px] font-mono text-[var(--color-muted-foreground)]">Ver: {doc.version} • {doc.department}</span>
+                          </div>
+                          <Button size="sm" variant="ghost" onClick={() => handleDeleteDocument(doc.id)}>
+                            <Trash2 className="w-3.5 h-3.5 text-red-500" />
+                          </Button>
+                        </div>
+                        <h4 className="text-xs font-bold text-[var(--color-foreground)]">{doc.title}</h4>
+                        <p className="text-[11px] text-[var(--color-muted-foreground)] line-clamp-3">{doc.content}</p>
+                        <p className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">✓ Active in Document/RAG Agent chunk index</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardBody>
+              </Card>
+            </div>
           ) : adminView === 'timetables' ? (
             /* ================= TIMETABLE MASTER VIEW ================= */
             <div className="space-y-6">
