@@ -374,7 +374,7 @@ export const FacultyClassRosterPage = () => {
                       </div>
                     ) : filteredRoster.length === 0 ? (
                       <div className="p-12 text-center text-xs text-[var(--color-muted-foreground)]">
-                        <Users className="w-8 h-8 mx-auto mb-2 text-stone-400 opacity-60" />
+                        <Users className="w-8 h-8 mx-auto mb-2 text-[var(--color-muted-foreground)] opacity-60" />
                         <p className="font-semibold text-[var(--color-foreground)]">No Students Found</p>
                         <p className="mt-1">
                           {searchQuery || filterDeficitOnly
@@ -555,7 +555,7 @@ export const FacultyClassRosterPage = () => {
                       </div>
                     ) : assignments.length === 0 ? (
                       <div className="p-12 text-center text-xs text-[var(--color-muted-foreground)]">
-                        <FileText className="w-8 h-8 mx-auto mb-2 text-stone-400 opacity-60" />
+                        <FileText className="w-8 h-8 mx-auto mb-2 text-[var(--color-muted-foreground)] opacity-60" />
                         <p className="font-semibold text-[var(--color-foreground)]">No Coursework Assigned Yet</p>
                         <p className="mt-1">
                           You haven't assigned any coursework tasks to Section {selectedSection ? selectedSection.sectionName : ''} yet.

@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import { RequireAuth, RequireRole, RequireGuest } from './guards/RouteGuards';
@@ -29,7 +30,8 @@ import LiveNotificationListener from './components/LiveNotificationListener';
 export default function App() {
   return (
     <BrowserRouter>
-      <ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
         <AuthProvider>
           <LiveNotificationListener />
           <Routes>
@@ -126,6 +128,7 @@ export default function App() {
           </Routes>
         </AuthProvider>
       </ToastProvider>
-    </BrowserRouter>
+    </ThemeProvider>
+  </BrowserRouter>
   );
 }

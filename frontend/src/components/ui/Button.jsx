@@ -16,7 +16,7 @@ export const Button = ({
 
   const variants = {
     primary: 'bg-[var(--color-primary)] text-white hover:opacity-90 focus:ring-[var(--color-primary)] shadow-sm',
-    secondary: 'bg-[var(--color-card)] text-[var(--color-foreground)] border border-[var(--color-border)] hover:bg-stone-100 dark:hover:bg-stone-800',
+    secondary: 'bg-[var(--color-card)] text-[var(--color-foreground)] border border-[var(--color-border)] hover:bg-[var(--color-border)]/50',
     outline: 'border border-[var(--color-border)] text-[var(--color-foreground)] hover:bg-[var(--color-primary)]/10 hover:border-[var(--color-primary)]/40',
     ghost: 'text-[var(--color-foreground)] hover:bg-[var(--color-border)]/50',
     danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',

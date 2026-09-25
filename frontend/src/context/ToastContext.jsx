@@ -31,7 +31,7 @@ export const ToastProvider = ({ children }) => {
                 ? 'bg-emerald-50 dark:bg-emerald-950/80 border-emerald-200 dark:border-emerald-800 text-emerald-900 dark:text-emerald-100'
                 : toast.type === 'error'
                 ? 'bg-red-50 dark:bg-red-950/80 border-red-200 dark:border-red-800 text-red-900 dark:text-red-100'
-                : 'bg-stone-50 dark:bg-stone-900 border-[var(--color-border)] text-[var(--color-foreground)]'
+                : 'bg-[var(--color-card)] border-[var(--color-border)] text-[var(--color-foreground)]'
             }`}
           >
             <div className="flex items-center gap-2.5">

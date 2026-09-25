@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import Avatar from './Avatar';
 import Badge from './Badge';
 import api from '../../services/api';
@@ -8,9 +9,9 @@ import { Bell, ChevronDown, LogOut, User, Settings, HelpCircle, Shield, Moon, Su
 
 export const Navbar = () => {
   const { user, role, logout } = useAuth();
+  const { isDark, toggleTheme } = useTheme();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
-  const [darkMode, setDarkMode] = useState(false);
   const [notifications, setNotifications] = useState([]);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
@@ -41,16 +42,6 @@ export const Navbar = () => {
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
-
-  const toggleDarkMode = () => {
-    if (document.documentElement.classList.contains('dark')) {
-      document.documentElement.classList.remove('dark');
-      setDarkMode(false);
-    } else {
-      document.documentElement.classList.add('dark');
-      setDarkMode(true);
-    }
-  };
 
   const handleMarkAsRead = async (id) => {
     try {
@@ -90,11 +81,11 @@ export const Navbar = () => {
         <div className="flex items-center gap-3" ref={dropdownRef}>
           {/* Dark mode toggle */}
           <button
-            onClick={toggleDarkMode}
+            onClick={toggleTheme}
             className="p-2 rounded-lg text-[var(--color-muted-foreground)] hover:text-[var(--color-foreground)] hover:bg-[var(--color-border)]/50 transition-colors"
-            title="Toggle theme"
+            title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
           >
-            {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+            {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
 
           {/* Database-backed Notifications */}

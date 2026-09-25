@@ -909,7 +909,7 @@ export const FacultyPortal = () => {
                 <CardBody className="p-0">
                   {myTimetable.filter(t => myDayFilter === 'ALL' || t.dayOfWeek === myDayFilter).length === 0 ? (
                     <div className="p-12 text-center text-xs text-[var(--color-muted-foreground)]">
-                      <Clock className="w-8 h-8 mx-auto mb-2 text-stone-400 opacity-60" />
+                      <Clock className="w-8 h-8 mx-auto mb-2 text-[var(--color-muted-foreground)] opacity-60" />
                       <p className="font-semibold text-[var(--color-foreground)]">No Lectures Scheduled</p>
                       <p className="mt-1">You have no teaching periods scheduled for {myDayFilter === 'ALL' ? 'the week' : myDayFilter}.</p>
                     </div>
@@ -1019,7 +1019,7 @@ export const FacultyPortal = () => {
                     {conflictWarnings.map((cw, i) => (
                       <div key={i} className="text-[11px] text-amber-800 dark:text-amber-300">
                         <p className="font-semibold">• [{cw.type}] {cw.message}</p>
-                        <p className="text-stone-500 dark:text-stone-400 mt-0.5"><em>Recommendation:</em> {cw.recommendation}</p>
+                        <p className="text-[var(--color-muted-foreground)] mt-0.5"><em>Recommendation:</em> {cw.recommendation}</p>
                       </div>
                     ))}
                   </div>
@@ -1123,7 +1123,7 @@ export const FacultyPortal = () => {
                 <CardBody className="p-0">
                   {sectionTimetable.length === 0 ? (
                     <div className="p-12 text-center text-xs text-[var(--color-muted-foreground)]">
-                      <BookOpen className="w-8 h-8 mx-auto mb-2 text-stone-400 opacity-60" />
+                      <BookOpen className="w-8 h-8 mx-auto mb-2 text-[var(--color-muted-foreground)] opacity-60" />
                       <p className="font-semibold text-[var(--color-foreground)]">No Lectures Configured</p>
                       <p className="mt-1">Click "Add Period" to configure lectures for this section.</p>
                     </div>
@@ -1565,7 +1565,7 @@ export const FacultyPortal = () => {
                 {(!data?.announcements || data.announcements.length === 0) ? (
                   <Card>
                     <CardBody className="p-8 text-center text-xs text-[var(--color-muted-foreground)]">
-                      <Bell className="w-8 h-8 mx-auto mb-2 text-stone-400 opacity-60" />
+                      <Bell className="w-8 h-8 mx-auto mb-2 text-[var(--color-muted-foreground)] opacity-60" />
                       <p className="font-semibold text-[var(--color-foreground)]">No Announcements Posted</p>
                       <p className="mt-1">Department circulars and administrative broadcasts will appear here.</p>
                     </CardBody>
@@ -1763,7 +1763,7 @@ export const FacultyPortal = () => {
 
                     {timetables.length === 0 ? (
                       <div className="p-8 text-center text-xs text-[var(--color-muted-foreground)]">
-                        <BookOpen className="w-8 h-8 mx-auto mb-2 text-stone-400 opacity-60" />
+                        <BookOpen className="w-8 h-8 mx-auto mb-2 text-[var(--color-muted-foreground)] opacity-60" />
                         <p className="font-semibold text-[var(--color-foreground)]">No Lectures Scheduled</p>
                         <p className="mt-1">Click "Add Lecture" to set up classes for Section {assignedSec}.</p>
                       </div>
@@ -1817,7 +1817,7 @@ export const FacultyPortal = () => {
                   <CardBody className="p-0">
                     {mentees.length === 0 ? (
                       <div className="p-8 text-center text-xs text-[var(--color-muted-foreground)]">
-                        <Users className="w-8 h-8 mx-auto mb-2 text-stone-400 opacity-60" />
+                        <Users className="w-8 h-8 mx-auto mb-2 text-[var(--color-muted-foreground)] opacity-60" />
                         <p className="font-semibold text-[var(--color-foreground)]">No Students Registered Yet</p>
                         <p className="mt-1">When students register with Department "{assignedDept}" and Section "{assignedSec}", they will automatically appear here.</p>
                       </div>

@@ -403,7 +403,7 @@ export const StudentPortal = () => {
                           {t.status === 'COMPLETED' ? (
                             <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                           ) : (
-                            <Circle className="w-4 h-4 text-stone-400" />
+                            <Circle className="w-4 h-4 text-[var(--color-muted-foreground)]" />
                           )}
                         </button>
                         <div>
@@ -417,7 +417,7 @@ export const StudentPortal = () => {
                       </div>
                       <button
                         onClick={() => handleDeleteTask(t.id)}
-                        className="text-stone-400 hover:text-red-500 transition-colors p-1"
+                        className="text-[var(--color-muted-foreground)] hover:text-red-500 transition-colors p-1"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -544,7 +544,7 @@ export const StudentPortal = () => {
                               {t.status === 'COMPLETED' ? (
                                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                               ) : (
-                                <Circle className="w-4 h-4 text-stone-400" />
+                                <Circle className="w-4 h-4 text-[var(--color-muted-foreground)]" />
                               )}
                             </button>
                             <p className={`text-xs ${t.status === 'COMPLETED' ? 'line-through text-[var(--color-muted-foreground)]' : 'text-[var(--color-foreground)] font-medium'}`}>

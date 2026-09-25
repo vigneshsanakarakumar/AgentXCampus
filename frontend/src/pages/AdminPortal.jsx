@@ -775,7 +775,7 @@ export const AdminPortal = () => {
                 action={
                   <div className="flex flex-wrap items-center gap-2">
                     <div className="relative">
-                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-stone-400" />
+                      <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-[var(--color-muted-foreground)]" />
                       <input
                         type="text"
                         placeholder="Search student or roll no..."
@@ -813,7 +813,7 @@ export const AdminPortal = () => {
               <CardBody className="p-0">
                 {filteredStudents.length === 0 ? (
                   <div className="p-8 text-center text-xs text-[var(--color-muted-foreground)]">
-                    <Users className="w-8 h-8 mx-auto mb-2 text-stone-400 opacity-60" />
+                    <Users className="w-8 h-8 mx-auto mb-2 text-[var(--color-muted-foreground)] opacity-60" />
                     <p className="font-semibold text-[var(--color-foreground)]">No Students Found</p>
                   </div>
                 ) : (
@@ -948,7 +948,7 @@ export const AdminPortal = () => {
                                       <button
                                         type="button"
                                         onClick={() => handleRemoveMentorSection(f.id, ms.id)}
-                                        className="hover:text-red-500 font-bold ml-0.5 text-xs text-stone-400 hover:scale-110 transition-all"
+                                        className="hover:text-red-500 font-bold ml-0.5 text-xs text-[var(--color-muted-foreground)] hover:scale-110 transition-all"
                                         title="Remove mentor section mapping"
                                       >
                                         ×
@@ -960,7 +960,7 @@ export const AdminPortal = () => {
                                     Section {f.assignedSection}
                                   </Badge>
                                 ) : (
-                                  <span className="text-stone-400">Not assigned</span>
+                                  <span className="text-[var(--color-muted-foreground)]">Not assigned</span>
                                 )}
                               </div>
                             </td>
@@ -2041,7 +2041,7 @@ export const AdminPortal = () => {
                           </div>
                           <p className="text-xs font-medium text-[var(--color-foreground)]">"{log.userQuery}"</p>
                           {log.toolsUsed && (
-                            <p className="text-[10px] text-stone-500 mt-0.5">
+                            <p className="text-[10px] text-[var(--color-muted-foreground)] mt-0.5">
                               Tools: <span className="font-mono text-[var(--color-primary)]">{log.toolsUsed}</span>
                             </p>
                           )}

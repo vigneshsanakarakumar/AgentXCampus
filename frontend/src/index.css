@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  /* Light Mode Semantic Tokens */
+  /* Light Mode Semantic Tokens (Default) */
   --color-primary: hsl(360, 49%, 50%);
   --color-background: hsl(360, 12%, 97%);
   --color-card: hsl(360, 12%, 97%);
@@ -12,9 +12,20 @@
   --color-foreground: hsl(360, 30%, 10%);
 }
 
+html.dark,
+.dark {
+  /* Dark Mode Semantic Tokens */
+  --color-primary: hsl(360, 49%, 55%);
+  --color-background: hsl(360, 15%, 12%);
+  --color-card: hsl(360, 15%, 12%);
+  --color-border: hsl(360, 15%, 22%);
+  --color-muted-foreground: hsl(360, 20%, 65%);
+  --color-foreground: hsl(360, 15%, 94%);
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    /* Dark Mode Semantic Tokens */
+  :root:not(.light) {
+    /* Fallback for system dark mode when no explicit class is set */
     --color-primary: hsl(360, 49%, 55%);
     --color-background: hsl(360, 15%, 12%);
     --color-card: hsl(360, 15%, 12%);

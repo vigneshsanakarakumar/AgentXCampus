@@ -318,13 +318,13 @@ export const SignupPage = () => {
                 {/* Password checks */}
                 <div className="p-3 rounded-lg bg-[var(--color-background)] border border-[var(--color-border)] text-xs space-y-1">
                   <div className="flex items-center gap-1.5">
-                    {isPasswordValid ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <X className="w-3.5 h-3.5 text-stone-400" />}
+                    {isPasswordValid ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <X className="w-3.5 h-3.5 text-[var(--color-muted-foreground)]" />}
                     <span className={isPasswordValid ? 'text-emerald-700 dark:text-emerald-400' : 'text-[var(--color-muted-foreground)]'}>
                       At least 6 characters
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    {isMatch ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <X className="w-3.5 h-3.5 text-stone-400" />}
+                    {isMatch ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <X className="w-3.5 h-3.5 text-[var(--color-muted-foreground)]" />}
                     <span className={isMatch ? 'text-emerald-700 dark:text-emerald-400' : 'text-[var(--color-muted-foreground)]'}>
                       Passwords match
                     </span>
