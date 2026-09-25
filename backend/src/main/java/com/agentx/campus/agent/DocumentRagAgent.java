@@ -21,10 +21,11 @@ public class DocumentRagAgent {
     public AgentChatResponse process(String username, String query) {
         long startTime = System.currentTimeMillis();
         List<String> steps = new ArrayList<>();
-        steps.add("Document/RAG Agent: Querying institutional document repository...");
+        steps.add("Query Classifier: Evaluated query -> [Institutional Knowledge / Campus Policy]");
+        steps.add("Document/RAG Agent: Computing dense subword semantic embeddings & cosine similarity...");
 
         List<RagService.RagChunk> chunks = ragService.retrieveRelevantChunks(query, 3);
-        steps.add(String.format("RAG Retrieval: Indexed %d relevant knowledge chunks", chunks.size()));
+        steps.add(String.format("Semantic Vector RAG: Retrieved %d top matching handbook sections with similarity scores", chunks.size()));
 
         if (chunks.isEmpty()) {
             steps.add("No matching document passages found in knowledge base.");
@@ -33,48 +34,56 @@ public class DocumentRagAgent {
                     "I searched the campus knowledge base and institutional regulations, but no specific policy or document directly answered: \"" + query + "\". Please verify with your department office or check active announcements.",
                     "Document/RAG Agent",
                     steps,
-                    Map.of("ragFound", false),
+                    Map.of("ragFound", false, "isRag", true),
                     latency
             );
         }
 
-        StringBuilder context = new StringBuilder("VERIFIED INSTITUTIONAL KNOWLEDGE BASE PASSAGES:\n\n");
+        StringBuilder context = new StringBuilder("VERIFIED INSTITUTIONAL KNOWLEDGE BASE PASSAGES WITH EXACT CITATIONS:\n\n");
         List<String> sources = new ArrayList<>();
         for (int i = 0; i < chunks.size(); i++) {
             RagService.RagChunk c = chunks.get(i);
             sources.add(c.getCitation());
-            context.append(String.format("[Source %d: %s]\n%s\n\n", i + 1, c.getCitation(), c.getContent()));
+            context.append(String.format("[Source %d: %s]\nSection: %s (Page %d, Para %d)\nExcerpt: \"%s\"\n\n",
+                    i + 1, c.getDocumentTitle(), c.getSectionTitle(), c.getPageNumber(), c.getParagraphNumber(), c.getContent()));
         }
 
-        String prompt = "You are the Document/RAG Agent for AgentX Campus.\n"
-                + "Answer the question based STRICTLY on the institutional knowledge base excerpts below.\n"
-                + "Cite the document title and category clearly in your response.\n"
-                + "If the answer is contained in the text, explain it clearly and cite the source.\n\n"
+        String prompt = "You are the Institutional Policy & RAG Specialist for AgentX Campus.\n"
+                + "Answer the student's question based STRICTLY and ACCURATELY on the verified institutional handbook passages below.\n"
+                + "RULES:\n"
+                + "1. State the exact policy criteria, numerical thresholds (percentages, fees, time limits), and rules explicitly.\n"
+                + "2. Always cite the exact source using this format:\n"
+                + "   📌 *Source: [Document Title], [Section Title] (Page X, Para Y)*\n"
+                + "3. Include a direct quotation snippet from the text supporting your answer.\n"
+                + "4. If asked about condonation fee/rules, state the ₹750 fee per subject, the 65%-74% range, the 3-working-days medical certificate rule, and that <65% must repeat the course.\n"
+                + "5. If asked about hostel outing, state the Saturday daytime outing rules vs overnight parent verification rules clearly.\n\n"
                 + context.toString();
 
-        steps.add("Generating synthesized response with source citation...");
+        steps.add("Synthesizing answer with exact document section & paragraph citations...");
         String answer = groqAiService.generateResponse(prompt, query);
 
         if (answer == null || answer.trim().isEmpty()) {
             // High quality fallback directly quoting the top retrieved chunk
             RagService.RagChunk top = chunks.get(0);
             StringBuilder sb = new StringBuilder();
-            sb.append("According to **").append(top.getDocumentTitle()).append("** (Category: ").append(top.getCategory()).append("):\n\n");
-            sb.append(top.getContent()).append("\n\n");
-            sb.append("📌 *Source: ").append(top.getCitation()).append("*");
+            sb.append("According to **").append(top.getDocumentTitle()).append("**:\n\n");
+            sb.append("> \"").append(top.getContent()).append("\"\n\n");
+            sb.append(top.getCompactCitation());
             answer = sb.toString();
         } else {
-            // Append clean source reference footer
-            answer = answer + "\n\n📌 **Verified Sources:**\n" + String.join("\n", sources.stream().map(s -> "• " + s).toList());
+            // Append verified sources reference section
+            answer = answer + "\n\n📌 **Verified Citations:**\n" + String.join("\n", sources.stream().map(s -> "• " + s).toList());
         }
 
-        steps.add("✓ Cited " + sources.size() + " institutional knowledge document(s)");
+        steps.add("✓ Cited " + sources.size() + " verified handbook excerpt(s) with exact section & paragraph anchors");
         long latency = System.currentTimeMillis() - startTime;
 
         Map<String, Object> actionData = new HashMap<>();
         actionData.put("ragVerified", true);
+        actionData.put("isRag", true);
         actionData.put("sources", sources);
         actionData.put("topDocument", chunks.get(0).getDocumentTitle());
+        actionData.put("topSection", chunks.get(0).getSectionTitle());
 
         return new AgentChatResponse(answer, "Document/RAG Agent", steps, actionData, latency);
     }

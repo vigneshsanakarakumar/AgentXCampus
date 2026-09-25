@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import api from '../../services/api';
-import Card, { CardHeader, CardBody } from './Card';
+import Card, { CardHeader } from './Card';
 import Button from './Button';
 import Badge from './Badge';
-import { Bot, Send, Sparkles, CheckCircle2, AlertTriangle, ArrowRight, Loader2, ShieldCheck, Wrench, FileText, CheckSquare, Layers } from 'lucide-react';
+import { Bot, Send, Loader2, Wrench, CheckSquare, Layers, BookOpen, Sparkles } from 'lucide-react';
 
 export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
   const [query, setQuery] = useState(initialQuery);
   const [messages, setMessages] = useState([
     {
       sender: 'agent',
-      text: "Hello! I am your AgentX Campus Orchestrator. I coordinate specialized agents for Academics, Schedules, Knowledge Base (RAG), and Task Planning.\n\nTry asking me about your classes today, assignment deadlines, attendance regulations, or request a multi-step study plan!",
+      text: "Hello! I am your AgentX Campus Orchestrator. I coordinate specialized agents for Academics, Schedules, Knowledge Base (Semantic Vector RAG), and General AI Copilot.\n\nTry asking me about attendance condonation rules, hostel Saturday outing guidelines, your class timetable, or general coding questions!",
       steps: [],
     }
   ]);
@@ -18,11 +18,11 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
   const [currentStep, setCurrentStep] = useState('');
 
   const suggestions = [
+    "What is the condonation fee if my attendance is 68%?",
+    "Can hostellers leave on Saturday without parents call?",
+    "Can you write a bubble sort in Python?",
     "What classes do I have today?",
     "When is my DBMS assignment due?",
-    "What is my attendance in each subject?",
-    "What are the attendance regulations according to college policy?",
-    "Help me prepare for my DBMS internal exam.",
     "The projector in CS-204 is not working."
   ];
 
@@ -36,41 +36,165 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
     setLoading(true);
     setCurrentStep('Orchestrator Agent: Analyzing user intent & selecting specialized agent...');
 
+    const token = localStorage.getItem('token');
+    let accumulatedText = '';
+    let finalSteps = [];
+    let detectedAgentType = 'AgentX Assistant';
+    let actionData = null;
+    let latencyMs = null;
+
+    // Create placeholder agent response for live streaming
+    setMessages((prev) => [
+      ...prev,
+      {
+        sender: 'agent',
+        text: '',
+        agentType: 'AgentX Assistant',
+        steps: [],
+        streaming: true,
+      }
+    ]);
+
     try {
-      const res = await api.post('/agent/chat', { query: text });
-      const data = res.data;
+      const response = await fetch('/api/v1/agent/chat/stream', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ query: text })
+      });
 
-      if (data.steps && data.steps.length > 0) {
-        for (let i = 0; i < data.steps.length; i++) {
-          setCurrentStep(data.steps[i]);
-          await new Promise((r) => setTimeout(r, 120));
+      if (!response.ok || !response.body) {
+        throw new Error('Streaming response not available');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop(); // Retain incomplete line
+
+        let currentEvent = null;
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('event:')) {
+            currentEvent = trimmed.substring(6).trim();
+          } else if (trimmed.startsWith('data:')) {
+            const dataStr = trimmed.substring(5).trim();
+            if (!dataStr) continue;
+
+            try {
+              const parsed = JSON.parse(dataStr);
+
+              if (currentEvent === 'step' || parsed.step) {
+                const s = parsed.step;
+                setCurrentStep(s);
+                if (!finalSteps.includes(s)) {
+                  finalSteps.push(s);
+                }
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const last = updated[updated.length - 1];
+                  if (last && last.sender === 'agent') {
+                    last.steps = [...finalSteps];
+                  }
+                  return updated;
+                });
+              } else if (currentEvent === 'token' || parsed.token) {
+                accumulatedText += parsed.token;
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const last = updated[updated.length - 1];
+                  if (last && last.sender === 'agent') {
+                    last.text = accumulatedText;
+                    last.streaming = true;
+                  }
+                  return updated;
+                });
+              } else if (currentEvent === 'done' || parsed.answer) {
+                detectedAgentType = parsed.agentType || detectedAgentType;
+                actionData = parsed.actionData || null;
+                latencyMs = parsed.latencyMs || null;
+                if (parsed.steps && parsed.steps.length > 0) {
+                  finalSteps = parsed.steps;
+                }
+                if (parsed.answer) {
+                  accumulatedText = parsed.answer;
+                }
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  const last = updated[updated.length - 1];
+                  if (last && last.sender === 'agent') {
+                    last.text = accumulatedText;
+                    last.agentType = detectedAgentType;
+                    last.actionData = actionData;
+                    last.latencyMs = latencyMs;
+                    last.steps = finalSteps;
+                    last.streaming = false;
+                  }
+                  return updated;
+                });
+                if (onActionCompleted) {
+                  onActionCompleted(parsed);
+                }
+              }
+            } catch (pErr) {
+              // Non-JSON SSE line
+            }
+          }
         }
       }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          sender: 'agent',
-          text: data.answer,
-          agentType: data.agentType,
-          steps: data.steps || [],
-          actionData: data.actionData,
-          latencyMs: data.latencyMs,
+      setMessages((prev) => {
+        const updated = [...prev];
+        const last = updated[updated.length - 1];
+        if (last && last.sender === 'agent') {
+          last.streaming = false;
         }
-      ]);
+        return updated;
+      });
 
-      if (onActionCompleted) {
-        onActionCompleted(data);
-      }
     } catch (err) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          sender: 'agent',
-          text: "I was unable to complete this request right now. Please verify your connection or try rephrasing your question.",
-          isError: true,
+      console.warn('Streaming error, falling back to standard chat API:', err);
+      try {
+        const res = await api.post('/agent/chat', { query: text });
+        const data = res.data;
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last && last.sender === 'agent') {
+            last.text = data.answer;
+            last.agentType = data.agentType;
+            last.steps = data.steps || [];
+            last.actionData = data.actionData;
+            last.latencyMs = data.latencyMs;
+            last.streaming = false;
+          }
+          return updated;
+        });
+        if (onActionCompleted) {
+          onActionCompleted(data);
         }
-      ]);
+      } catch (postErr) {
+        setMessages((prev) => {
+          const updated = [...prev];
+          const last = updated[updated.length - 1];
+          if (last && last.sender === 'agent') {
+            last.text = "I was unable to complete this request right now. Please verify your connection or try rephrasing your question.";
+            last.isError = true;
+            last.streaming = false;
+          }
+          return updated;
+        });
+      }
     } finally {
       setLoading(false);
       setCurrentStep('');
@@ -81,11 +205,11 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
     <Card className="flex flex-col h-[620px] shadow-sm">
       <CardHeader
         title="AgentX Autonomous Assistant"
-        subtitle="Central Orchestrator • Academic, Schedule, RAG & Task Agents"
+        subtitle="Central Orchestrator • Semantic Vector RAG, Academic, Schedule & General AI"
         action={
           <Badge variant="primary" size="sm">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse" />
-            Multi-Agent Active
+            Token Streaming Active
           </Badge>
         }
       />
@@ -118,7 +242,27 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
                 </div>
               )}
 
-              <p className="whitespace-pre-wrap">{m.text}</p>
+              <p className="whitespace-pre-wrap">
+                {m.text}
+                {m.streaming && (
+                  <span className="inline-block w-1.5 h-3.5 bg-[var(--color-primary)] ml-1 animate-pulse align-middle" />
+                )}
+              </p>
+
+              {/* Action Card: Verified Institutional RAG Citations */}
+              {m.actionData && m.actionData.sources && m.actionData.sources.length > 0 && (
+                <div className="mt-3 p-2.5 rounded-lg bg-sky-500/10 border border-sky-500/30 text-sky-900 dark:text-sky-200 space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-xs">
+                    <BookOpen className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                    <span>Verified Handbook Citations:</span>
+                  </div>
+                  {m.actionData.sources.map((src, sIdx) => (
+                    <div key={sIdx} className="text-[10px] font-mono bg-[var(--color-card)]/80 p-1.5 rounded border border-sky-500/20">
+                      📌 {src}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {/* Action Card: Grievance Incident */}
               {m.actionData && m.actionData.ticketNumber && (
@@ -168,7 +312,7 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
           </div>
         ))}
 
-        {loading && (
+        {loading && !messages[messages.length - 1]?.text && (
           <div className="flex flex-col items-start space-y-1.5 animate-pulse">
             <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-[var(--color-background)] border border-[var(--color-border)] text-xs text-[var(--color-muted-foreground)]">
               <Loader2 className="w-3.5 h-3.5 animate-spin text-[var(--color-primary)]" />
@@ -205,7 +349,7 @@ export const AgentXAssistant = ({ initialQuery = '', onActionCompleted }) => {
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Ask about timetable, assignments, attendance, college regulations, or study plans..."
+            placeholder="Ask about regulations, attendance condonation, hostel rules, or general questions..."
             className="flex-1 bg-[var(--color-background)] text-[var(--color-foreground)] placeholder-[var(--color-muted-foreground)] text-xs rounded-lg px-3 py-2.5 border border-[var(--color-border)] focus:outline-none focus:border-[var(--color-primary)] transition-colors"
           />
           <Button

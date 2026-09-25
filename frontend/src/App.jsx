@@ -23,12 +23,14 @@ import FacultyClassRosterPage from './pages/FacultyClassRosterPage';
 import StaffPortal from './pages/StaffPortal';
 import AdminPortal from './pages/AdminPortal';
 import ActivateStaffPage from './pages/ActivateStaffPage';
+import LiveNotificationListener from './components/LiveNotificationListener';
 
 export default function App() {
   return (
     <BrowserRouter>
       <ToastProvider>
         <AuthProvider>
+          <LiveNotificationListener />
           <Routes>
             {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />

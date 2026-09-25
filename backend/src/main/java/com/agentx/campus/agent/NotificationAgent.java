@@ -5,6 +5,7 @@ import com.agentx.campus.model.StudentProfile;
 import com.agentx.campus.model.User;
 import com.agentx.campus.repository.NotificationRepository;
 import com.agentx.campus.repository.StudentProfileRepository;
+import com.agentx.campus.service.NotificationStreamService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,11 +16,14 @@ public class NotificationAgent {
 
     private final NotificationRepository notificationRepository;
     private final StudentProfileRepository studentProfileRepository;
+    private final NotificationStreamService notificationStreamService;
 
     public NotificationAgent(NotificationRepository notificationRepository,
-                             StudentProfileRepository studentProfileRepository) {
+                             StudentProfileRepository studentProfileRepository,
+                             NotificationStreamService notificationStreamService) {
         this.notificationRepository = notificationRepository;
         this.studentProfileRepository = studentProfileRepository;
+        this.notificationStreamService = notificationStreamService;
     }
 
     @Transactional
@@ -27,12 +31,21 @@ public class NotificationAgent {
         return notifyUser(user, title, message, type, null);
     }
 
-    /** Overload with explainability — sets matchedBecause on the notification. */
+    /** Overload with explainability — sets matchedBecause on the notification and pushes SSE real-time alert. */
     @Transactional
     public Notification notifyUser(User user, String title, String message, String type, String matchedBecause) {
         Notification n = new Notification(user, title, message, type);
         if (matchedBecause != null) n.setMatchedBecause(matchedBecause);
-        return notificationRepository.save(n);
+        Notification saved = notificationRepository.save(n);
+
+        // Immediate real-time WebSocket / SSE push to active client
+        if (user != null && user.getUsername() != null) {
+            try {
+                notificationStreamService.sendRealtimeNotification(user.getUsername(), saved);
+            } catch (Exception ignored) {}
+        }
+
+        return saved;
     }
 
     @Transactional

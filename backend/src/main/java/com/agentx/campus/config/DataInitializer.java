@@ -1153,71 +1153,72 @@ public class DataInitializer implements CommandLineRunner {
     }
 
     private void seedKnowledgeDocuments() {
-        if (campusDocumentRepository.count() == 0) {
-            CampusDocument doc1 = new CampusDocument(
-                    "Autonomous Academic Regulations 2026 (Attendance, Grading, Credit System)",
-                    "REGULATION",
-                    "Official statutory regulations governing undergraduate B.Tech/B.E. degree programs.",
-                    "1. ATTENDANCE REQUIREMENTS:\n"
-                            + "A candidate who has fulfilled by attending not less than 75% of classes in each subject shall be eligible to appear for End Semester Examinations.\n"
-                            + "Condonation of shortage of attendance between 65% and 74% may be granted by the Academic Council solely on valid medical grounds supported by a certified medical certificate submitted within 3 working days.\n"
-                            + "Candidates who secure less than 65% attendance in any course are NOT permitted to write the end semester examination and must repeat the course in a subsequent semester.\n\n"
-                            + "2. GRADING SYSTEM & CGPA CALCULATION:\n"
-                            + "Grade O (Outstanding): 90-100 marks, Grade Point 10\n"
-                            + "Grade A+ (Excellent): 80-89 marks, Grade Point 9\n"
-                            + "Grade A (Very Good): 70-79 marks, Grade Point 8\n"
-                            + "Grade B+ (Good): 60-69 marks, Grade Point 7\n"
-                            + "Grade B (Above Average): 50-59 marks, Grade Point 6\n"
-                            + "Grade RA (Re-Appearance): Below 50 marks, Grade Point 0\n"
-                            + "Cumulative Grade Point Average (CGPA) is computed as sum of (Credits * Grade Points) divided by total credits earned across all semesters.",
-                    "All Departments", "PDF", "2026.1", "Dean of Academic Affairs"
-            );
+        // Upsert canonical institutional documents to ensure semantic RAG citations are always up-to-date
+        campusDocumentRepository.deleteAll();
 
-            CampusDocument doc2 = new CampusDocument(
-                    "Continuous Internal Assessment (CIA) & Evaluation Scheme",
-                    "EXAM_RULES",
-                    "Standard operating guidelines for CIA-1, CIA-2, lab continuous evaluation, and final weights.",
-                    "1. INTERNAL ASSESSMENT COMPOSITION (Total 40 Marks):\n"
-                            + "• CIA-1 Written Examination: 15 Marks (Conducted after 5 weeks of instruction)\n"
-                            + "• CIA-2 Written Examination: 15 Marks (Conducted after 10 weeks of instruction)\n"
-                            + "• Practical Assignments, Case Studies, and Quizzes: 10 Marks\n\n"
-                            + "2. END SEMESTER UNIVERSITY EXAMINATION (Total 60 Marks):\n"
-                            + "Written university examination of 3 hours duration covering all five units of the curriculum.\n"
-                            + "To pass a course, a student must secure at least 45% in the end semester examination and a minimum aggregate of 50% combined across internal and external examinations.",
-                    "Controller of Examinations", "PDF", "1.4", "Controller of Examinations"
-            );
+        CampusDocument doc1 = new CampusDocument(
+                "Autonomous Academic Regulations 2026 (Attendance, Grading, Credit System)",
+                "REGULATION",
+                "Official statutory regulations governing undergraduate B.Tech/B.E. degree programs.",
+                "1. ATTENDANCE REQUIREMENTS & CONDONATION:\n"
+                        + "A candidate who has fulfilled attendance by securing not less than 75% of classes in each subject shall be eligible to appear for End Semester Examinations without restriction.\n\n"
+                        + "Condonation of shortage of attendance between 65% and 74% (inclusive) may be granted by the Academic Council solely on valid medical grounds or approved collegiate representation, supported by an official medical certificate submitted to the department office within 3 working days. A mandatory condonation fee of ₹750 per subject must be remitted to the academic finance counter upon approval.\n\n"
+                        + "Candidates who secure less than 65% attendance in any course are strictly NOT permitted to write the end semester examination under any circumstances, receive zero condonation, and must repeat the course in a subsequent academic semester.\n\n"
+                        + "2. GRADING SYSTEM & CGPA CALCULATION:\n"
+                        + "Grade O (Outstanding): 90-100 marks, Grade Point 10\n"
+                        + "Grade A+ (Excellent): 80-89 marks, Grade Point 9\n"
+                        + "Grade A (Very Good): 70-79 marks, Grade Point 8\n"
+                        + "Grade B+ (Good): 60-69 marks, Grade Point 7\n"
+                        + "Grade B (Above Average): 50-59 marks, Grade Point 6\n"
+                        + "Grade RA (Re-Appearance): Below 50 marks, Grade Point 0\n\n"
+                        + "Cumulative Grade Point Average (CGPA) is computed as sum of (Credits * Grade Points) divided by total credits earned across all semesters.",
+                "All Departments", "PDF", "2026.1", "Dean of Academic Affairs"
+        );
 
-            CampusDocument doc3 = new CampusDocument(
-                    "Hostel Code of Conduct, Gate Pass Guidelines & Campus Rules",
-                    "CAMPUS_GUIDE",
-                    "Regulations governing student residential hostel blocks, curfew, visitor hours, and gate pass approvals.",
-                    "1. HOSTEL CURFEW & TIMINGS:\n"
-                            + "All residential students must return to their respective hostel blocks by 08:30 PM on weekdays and 09:00 PM on weekends.\n"
-                            + "Biometric attendance is registered at the hostel lobby between 08:30 PM and 09:00 PM nightly.\n\n"
-                            + "2. OUTING & GATE PASS PROCEDURES:\n"
-                            + "Students requesting home outpass or weekend leave must submit a digital request on the AgentX Campus portal at least 24 hours in advance.\n"
-                            + "Gate pass requires automated SMS verification from registered parent/guardian and approval from the designated Faculty Mentor or Residential Warden.\n\n"
-                            + "3. CAMPUS AMENITIES & WI-FI:\n"
-                            + "High-speed campus Wi-Fi 6 ('Campus-AirNet') is available across academic blocks and hostels 24/7. Peer-to-peer torrent traffic is strictly throttled.",
-                    "Hostel Administration", "PDF", "2.0", "Chief Residential Warden"
-            );
+        CampusDocument doc2 = new CampusDocument(
+                "Continuous Internal Assessment (CIA) & Evaluation Scheme",
+                "EXAM_RULES",
+                "Standard operating guidelines for CIA-1, CIA-2, lab continuous evaluation, and final weights.",
+                "1. INTERNAL ASSESSMENT COMPOSITION (Total 40 Marks):\n"
+                        + "• CIA-1 Written Examination: 15 Marks (Conducted after 5 weeks of instruction)\n"
+                        + "• CIA-2 Written Examination: 15 Marks (Conducted after 10 weeks of instruction)\n"
+                        + "• Practical Assignments, Case Studies, and Quizzes: 10 Marks\n\n"
+                        + "2. END SEMESTER UNIVERSITY EXAMINATION (Total 60 Marks):\n"
+                        + "Written university examination of 3 hours duration covering all five units of the curriculum.\n\n"
+                        + "To pass a course, a student must secure at least 45% in the end semester examination and a minimum aggregate of 50% combined across internal and external examinations.",
+                "Controller of Examinations", "PDF", "1.4", "Controller of Examinations"
+        );
 
-            CampusDocument doc4 = new CampusDocument(
-                    "Campus Placement Eligibility Criteria & Training Policy",
-                    "POLICY",
-                    "Guidelines for campus recruitments, Tier-1, Tier-2 CTC brackets, and dream company policies.",
-                    "1. PLACEMENT ELIGIBILITY:\n"
-                            + "Students with CGPA 7.0 or higher throughout their academic tenure without standing backlogs are eligible for Tier-1 recruitment drives (CTC > 10 LPA).\n"
-                            + "Students with CGPA 6.0 and up to 1 standing backlog may participate in Tier-2 and core engineering campus interviews.\n\n"
-                            + "2. ONE-STUDENT ONE-OFFER RULE:\n"
-                            + "A candidate who receives an offer with CTC less than 6 LPA may participate in Super Dream category drives (> 12 LPA). Once a Super Dream offer is secured, the candidate is marked placed and withdrawn from subsequent recruitment drives.\n\n"
-                            + "3. MANDATORY ATTENDANCE IN TRAINING:\n"
-                            + "Attendance in soft skills, competitive coding bootcamps, and mock interview marathons is mandatory. Missing more than 2 sessions disqualifies the candidate from the immediate subsequent drive.",
-                    "Career Development Centre", "PDF", "3.2", "Placement Director"
-            );
+        CampusDocument doc3 = new CampusDocument(
+                "Hostel Code of Conduct, Gate Pass Guidelines & Campus Rules",
+                "CAMPUS_GUIDE",
+                "Regulations governing student residential hostel blocks, curfew, visitor hours, and gate pass approvals.",
+                "1. HOSTEL CURFEW & TIMINGS:\n"
+                        + "All residential students must return to their respective hostel blocks by 08:30 PM on weekdays and 09:00 PM on weekends.\n\n"
+                        + "Biometric attendance is registered at the hostel lobby between 08:30 PM and 09:00 PM nightly.\n\n"
+                        + "2. OUTING & GATE PASS PROCEDURES:\n"
+                        + "Saturday Daytime Local Outing: Hostellers are permitted local daytime outing on Saturdays between 09:00 AM and 08:30 PM without parents' call or telephone confirmation, provided they register their digital outpass at the security biometric gate and return to the hostel before the 08:30 PM curfew.\n\n"
+                        + "Overnight & Extended Leave Verification: For overnight stays, leaves past 08:30 PM, or weekend home visits, hostellers CANNOT leave without parents' call. The residential warden must receive explicit verbal telephonic verification from the registered parent/guardian prior to authorizing gate departure.\n\n"
+                        + "3. CAMPUS AMENITIES & WI-FI:\n"
+                        + "High-speed campus Wi-Fi 6 ('Campus-AirNet') is available across academic blocks and hostels 24/7. Peer-to-peer torrent traffic is strictly throttled.",
+                "Hostel Administration", "PDF", "2.0", "Chief Residential Warden"
+        );
 
-            campusDocumentRepository.saveAll(List.of(doc1, doc2, doc3, doc4));
-            System.out.println("[DataInitializer] Seeded RAG knowledge base documents (4 institutional documents)");
-        }
+        CampusDocument doc4 = new CampusDocument(
+                "Campus Placement Eligibility Criteria & Training Policy",
+                "POLICY",
+                "Guidelines for campus recruitments, Tier-1, Tier-2 CTC brackets, and dream company policies.",
+                "1. PLACEMENT ELIGIBILITY:\n"
+                        + "Students with CGPA 7.0 or higher throughout their academic tenure without standing backlogs are eligible for Tier-1 recruitment drives (CTC > 10 LPA).\n\n"
+                        + "Students with CGPA 6.0 and up to 1 standing backlog may participate in Tier-2 and core engineering campus interviews.\n\n"
+                        + "2. ONE-STUDENT ONE-OFFER RULE:\n"
+                        + "A candidate who receives an offer with CTC less than 6 LPA may participate in Super Dream category drives (> 12 LPA). Once a Super Dream offer is secured, the candidate is marked placed and withdrawn from subsequent recruitment drives.\n\n"
+                        + "3. MANDATORY ATTENDANCE IN TRAINING:\n"
+                        + "Attendance in soft skills, competitive coding bootcamps, and mock interview marathons is mandatory. Missing more than 2 sessions disqualifies the candidate from the immediate subsequent drive.",
+                "Career Development Centre", "PDF", "3.2", "Placement Director"
+        );
+
+        campusDocumentRepository.saveAll(List.of(doc1, doc2, doc3, doc4));
+        System.out.println("[DataInitializer] Seeded RAG knowledge base documents (4 institutional documents with exact citations)");
     }
 }

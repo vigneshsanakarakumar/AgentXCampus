@@ -24,6 +24,7 @@ public class SupervisorAgent {
     private final TaskPlanningAgent taskPlanningAgent;
     private final GrievanceAgent grievanceAgent;
     private final CampusResourceAgent campusResourceAgent;
+    private final GeneralAiAgent generalAiAgent;
 
     private final UserRepository userRepository;
     private final AgentTaskLogRepository taskLogRepository;
@@ -38,6 +39,7 @@ public class SupervisorAgent {
             TaskPlanningAgent taskPlanningAgent,
             GrievanceAgent grievanceAgent,
             CampusResourceAgent campusResourceAgent,
+            GeneralAiAgent generalAiAgent,
             UserRepository userRepository,
             AgentTaskLogRepository taskLogRepository,
             AiConversationRepository conversationRepository,
@@ -49,6 +51,7 @@ public class SupervisorAgent {
         this.taskPlanningAgent = taskPlanningAgent;
         this.grievanceAgent = grievanceAgent;
         this.campusResourceAgent = campusResourceAgent;
+        this.generalAiAgent = generalAiAgent;
         this.userRepository = userRepository;
         this.taskLogRepository = taskLogRepository;
         this.conversationRepository = conversationRepository;
@@ -63,7 +66,7 @@ public class SupervisorAgent {
         String toolsUsed;
         int sourcesCount = 0;
 
-        // Multi-Agent Intent Routing
+        // Multi-Agent Intent Routing & Query Classifier
         if (isAttendanceExplainQuery(lower)) {
             intent = "Attendance Session Explainer";
             toolsUsed = "explainAttendanceEntry, getAttendance, findLeaveRequest";
@@ -84,19 +87,25 @@ public class SupervisorAgent {
             intent = "Campus Operations & Support";
             toolsUsed = "getCampusResources, createGrievance";
             response = studentSupportAgent.process(username, query);
-        } else if (isDocumentRagQuery(lower)) {
-            intent = "Institutional Policy & Regulations (RAG)";
-            toolsUsed = "searchKnowledgeBase, ragRetrieval";
-            response = documentRagAgent.process(username, query);
-            sourcesCount = (response.getActionData() instanceof java.util.Map<?, ?> map && map.containsKey("sources")) ? 3 : 1;
         } else if (isScheduleQuery(lower)) {
             intent = "Academic Schedule & Events";
             toolsUsed = "getTodaySchedule, getWeeklySchedule, getUpcomingEvents";
             response = scheduleAgent.process(username, query);
-        } else {
+        } else if (isDocumentRagQuery(lower)) {
+            // Query Classifier -> YES: Institutional Policy & Regulations RAG
+            intent = "Institutional Policy & Regulations (RAG)";
+            toolsUsed = "searchKnowledgeBase, semanticVectorRagRetrieval";
+            response = documentRagAgent.process(username, query);
+            sourcesCount = (response.getActionData() instanceof java.util.Map<?, ?> map && map.containsKey("sources")) ? 3 : 1;
+        } else if (isAcademicRegistryQuery(lower)) {
             intent = "Academic Registry";
             toolsUsed = "getAttendance, getAssignments, getCourses, getStudentProfile";
             response = academicAgent.process(username, query);
+        } else {
+            // Query Classifier -> NO: General AI Copilot
+            intent = "General AI Copilot";
+            toolsUsed = "generalAiReasoning";
+            response = generalAiAgent.process(username, query);
         }
 
         // Prepend Orchestrator classification step
@@ -180,7 +189,21 @@ public class SupervisorAgent {
                 q.contains("criteria") || q.contains("curfew") || q.contains("minimum attendance") ||
                 q.contains("grading") || q.contains("credit") || q.contains("dress code") ||
                 q.contains("hostel") || q.contains("cia evaluation") || q.contains("document") ||
-                q.contains("guideline") || q.contains("handbook");
+                q.contains("guideline") || q.contains("handbook") ||
+                q.contains("condonation") || q.contains("fee") || q.contains("68%") || q.contains("65%") ||
+                q.contains("74%") || q.contains("75%") || q.contains("attendance requirement") ||
+                q.contains("shortage") || q.contains("outpass") || q.contains("gate pass") ||
+                q.contains("outing") || q.contains("parent") || q.contains("saturday") ||
+                q.contains("can hosteller") || q.contains("hostellers") ||
+                q.contains("without parents") || q.contains("placement policy") || q.contains("code of conduct");
+    }
+
+    private boolean isAcademicRegistryQuery(String q) {
+        return q.contains("my attendance") || q.contains("my course") || q.contains("my subject") ||
+                q.contains("my assignment") || q.contains("my mark") || q.contains("my cgpa") ||
+                q.contains("my grade") || q.contains("my profile") || q.contains("my task") ||
+                (q.contains("attendance") && (q.contains("my") || q.contains("current") || q.contains("score") || q.contains("record"))) ||
+                (q.contains("assignment") && (q.contains("my") || q.contains("pending") || q.contains("due")));
     }
 
     private boolean isScheduleQuery(String q) {

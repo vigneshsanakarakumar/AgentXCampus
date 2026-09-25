@@ -15,10 +15,12 @@ public class AcademicAgent {
 
     private final CampusToolRegistry toolRegistry;
     private final GroqAiService groqAiService;
+    private final DocumentRagAgent documentRagAgent;
 
-    public AcademicAgent(CampusToolRegistry toolRegistry, GroqAiService groqAiService) {
+    public AcademicAgent(CampusToolRegistry toolRegistry, GroqAiService groqAiService, DocumentRagAgent documentRagAgent) {
         this.toolRegistry = toolRegistry;
         this.groqAiService = groqAiService;
+        this.documentRagAgent = documentRagAgent;
     }
 
     public AgentChatResponse process(String username, String query) {
@@ -26,6 +28,16 @@ public class AcademicAgent {
         List<String> steps = new ArrayList<>();
 
         String lowerQuery = query.toLowerCase();
+
+        // If the query pertains to college regulations, condonation, or hostel rules, cite exact handbook citations via RAG
+        if (isDocumentPolicyQuery(lowerQuery)) {
+            steps.add("Academic Agent: Detected institutional regulation / handbook inquiry");
+            steps.add("Academic Agent -> Delegating to Document/RAG Agent for exact section & paragraph citations");
+            AgentChatResponse ragRes = documentRagAgent.process(username, query);
+            ragRes.getSteps().addAll(0, steps);
+            return ragRes;
+        }
+
         boolean isExplainQuery = (lowerQuery.contains("why") || lowerQuery.contains("explain") || lowerQuery.contains("reason") || lowerQuery.contains("how come"))
                 && (lowerQuery.contains("absent") || lowerQuery.contains("marked") || lowerQuery.contains("attendance") || lowerQuery.contains("leave") || lowerQuery.contains("od"));
 
@@ -178,5 +190,13 @@ public class AcademicAgent {
         if (q.contains("network")) return "network";
         if (q.contains("security") || q.contains("crypto")) return "security";
         return "";
+    }
+
+    private boolean isDocumentPolicyQuery(String q) {
+        return q.contains("regulation") || q.contains("condonation") || q.contains("fee") ||
+                q.contains("handbook") || q.contains("policy") || q.contains("curfew") ||
+                q.contains("hostel") || q.contains("leave on saturday") || q.contains("without parents") ||
+                q.contains("outpass") || q.contains("gate pass") || q.contains("68%") || q.contains("65%") ||
+                q.contains("minimum attendance") || q.contains("grading system");
     }
 }

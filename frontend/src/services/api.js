@@ -21,7 +21,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      if (!window.location.pathname.startsWith('/login') && !window.location.pathname.startsWith('/signup') && window.location.pathname !== '/') {
+      const path = window.location.pathname;
+      const isPublic = path.startsWith('/login') || path.startsWith('/signup') || path === '/' || path.startsWith('/forgot-password') || path.startsWith('/reset-password');
+      // Only bounce to login if token is expired on protected actions, not during background /auth/me or public pages
+      if (!isPublic && error.config && !error.config.url.includes('/auth/me')) {
         localStorage.removeItem('agentx_token');
         localStorage.removeItem('agentx_user');
         window.location.href = '/login?expired=true';

@@ -4,9 +4,21 @@ import api from '../services/api';
 const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Synchronous initialization from localStorage prevents flash-of-unauthenticated state on refresh
+  const [user, setUser] = useState(() => {
+    try {
+      const savedUser = localStorage.getItem('agentx_user');
+      return savedUser ? JSON.parse(savedUser) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [token, setToken] = useState(() => {
+    return localStorage.getItem('agentx_token') || null;
+  });
+
+  const [loading, setLoading] = useState(false);
 
   const checkAuth = useCallback(async () => {
     const savedToken = localStorage.getItem('agentx_token');
@@ -21,12 +33,16 @@ export const AuthProvider = ({ children }) => {
       const response = await api.get('/auth/me');
       setUser(response.data);
       setToken(savedToken);
+      localStorage.setItem('agentx_user', JSON.stringify(response.data));
     } catch (err) {
-      console.error('Session validation failed:', err);
-      localStorage.removeItem('agentx_token');
-      localStorage.removeItem('agentx_user');
-      setUser(null);
-      setToken(null);
+      // Only clear credentials if backend explicitly reports unauthenticated or token expired
+      if (err.response && (err.response.status === 401 || err.response.status === 403)) {
+        console.warn('Session expired or unauthorized, clearing local credentials:', err);
+        localStorage.removeItem('agentx_token');
+        localStorage.removeItem('agentx_user');
+        setUser(null);
+        setToken(null);
+      }
     } finally {
       setLoading(false);
     }
@@ -89,7 +105,7 @@ export const AuthProvider = ({ children }) => {
         user,
         role: user ? user.role : null,
         token,
-        isAuthenticated: !!user,
+        isAuthenticated: !!user && !!token,
         loading,
         login,
         signup,
