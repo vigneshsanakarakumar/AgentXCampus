@@ -14,9 +14,11 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 public class AgentController {
 
     private final AgentService agentService;
+    private final com.agentx.campus.service.ProactiveAgentService proactiveAgentService;
 
-    public AgentController(AgentService agentService) {
+    public AgentController(AgentService agentService, com.agentx.campus.service.ProactiveAgentService proactiveAgentService) {
         this.agentService = agentService;
+        this.proactiveAgentService = proactiveAgentService;
     }
 
     @PostMapping("/chat")
@@ -35,5 +37,10 @@ public class AgentController {
     @GetMapping("/tasks")
     public ResponseEntity<?> getRecentTasks() {
         return ResponseEntity.ok(agentService.getRecentTasks());
+    }
+
+    @PostMapping("/proactive/run-audit")
+    public ResponseEntity<?> runProactiveAttendanceAudit() {
+        return ResponseEntity.ok(proactiveAgentService.runAttendanceRiskAudit());
     }
 }

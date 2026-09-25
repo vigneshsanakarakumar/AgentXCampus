@@ -32,6 +32,7 @@ public class ExamSchedule {
 
     public ExamSchedule() {}
     public Long getId() { return id; }
+    public void setId(Long v) { id = v; }
     public String getSubjectCode() { return subjectCode; }
     public void setSubjectCode(String v) { subjectCode = v; }
     public String getSubjectName() { return subjectName; }

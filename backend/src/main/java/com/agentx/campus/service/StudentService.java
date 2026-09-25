@@ -234,16 +234,34 @@ public class StudentService {
     }
 
     @Transactional
-    public StudentTask updateTaskStatus(Long taskId, String status) {
+    public StudentTask updateTaskStatus(Long taskId, String status, String username) {
         StudentTask task = studentTaskRepository.findById(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found with ID: " + taskId));
+        if (username != null && task.getUser() != null && !task.getUser().getUsername().equals(username)) {
+            throw new org.springframework.security.access.AccessDeniedException("Not authorized to update this task");
+        }
         task.setStatus(status);
         return studentTaskRepository.save(task);
     }
 
     @Transactional
+    public StudentTask updateTaskStatus(Long taskId, String status) {
+        return updateTaskStatus(taskId, status, null);
+    }
+
+    @Transactional
+    public void deleteTask(Long taskId, String username) {
+        StudentTask task = studentTaskRepository.findById(taskId)
+                .orElseThrow(() -> new IllegalArgumentException("Task not found with ID: " + taskId));
+        if (username != null && task.getUser() != null && !task.getUser().getUsername().equals(username)) {
+            throw new org.springframework.security.access.AccessDeniedException("Not authorized to delete this task");
+        }
+        studentTaskRepository.delete(task);
+    }
+
+    @Transactional
     public void deleteTask(Long taskId) {
-        studentTaskRepository.deleteById(taskId);
+        deleteTask(taskId, null);
     }
 
     @Transactional

@@ -142,6 +142,50 @@ public class RagService {
     }
 
     /**
+     * Self-Correcting RAG Retrieval: Checks initial retrieval confidence and applies domain synonym
+     * expansion / query reformulation if initial affinity score is low.
+     */
+    public List<RagChunk> retrieveWithSelfCorrection(String query, int topK, List<String> traceCollector) {
+        List<RagChunk> initialResults = retrieveRelevantChunks(query, topK);
+        if (initialResults.isEmpty() || initialResults.get(0).getScore() < 0.45) {
+            String rewritten = expandAndReformulateQuery(query);
+            if (!rewritten.equalsIgnoreCase(query)) {
+                if (traceCollector != null) {
+                    traceCollector.add("Self-Correction Loop: Initial score low (<0.45). Reformulated domain query -> \"" + rewritten + "\"");
+                }
+                List<RagChunk> rewrittenResults = retrieveRelevantChunks(rewritten, topK);
+                if (!rewrittenResults.isEmpty() && (initialResults.isEmpty() || rewrittenResults.get(0).getScore() > initialResults.get(0).getScore())) {
+                    if (traceCollector != null) {
+                        traceCollector.add(String.format("Self-Correction Loop: Retrieval confidence improved from %.3f to %.3f",
+                                initialResults.isEmpty() ? 0.0 : initialResults.get(0).getScore(),
+                                rewrittenResults.get(0).getScore()));
+                    }
+                    return rewrittenResults;
+                }
+            }
+        }
+        return initialResults;
+    }
+
+    private String expandAndReformulateQuery(String q) {
+        String lower = q.toLowerCase();
+        StringBuilder expanded = new StringBuilder(q);
+        if (lower.contains("condonation") || lower.contains("68%") || lower.contains("65%") || lower.contains("74%") || lower.contains("attendance fee")) {
+            expanded.append(" attendance shortage condonation 750 fee 3 working days medical council");
+        }
+        if (lower.contains("hosteller") || lower.contains("hostel") || lower.contains("outpass") || lower.contains("gate pass") || lower.contains("outing") || lower.contains("curfew")) {
+            expanded.append(" saturday daytime outing curfew 08:30 pm parents call biometric");
+        }
+        if (lower.contains("placement") || lower.contains("interview") || lower.contains("job") || lower.contains("tier-1") || lower.contains("ctc")) {
+            expanded.append(" cgpa 7.0 standing backlogs tier-1 10 lpa super dream");
+        }
+        if (lower.contains("cia") || lower.contains("internal") || lower.contains("marks") || lower.contains("evaluation") || lower.contains("passing")) {
+            expanded.append(" internal assessment 40 marks end semester 60 marks passing 45%");
+        }
+        return expanded.toString();
+    }
+
+    /**
      * Compute Dense L2-Normalized Semantic Vector Embedding using Multi-Scale Character N-Grams and Word Hashing.
      */
     public double[] computeEmbedding(String text) {

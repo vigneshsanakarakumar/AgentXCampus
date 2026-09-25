@@ -24,8 +24,8 @@ public class DocumentRagAgent {
         steps.add("Query Classifier: Evaluated query -> [Institutional Knowledge / Campus Policy]");
         steps.add("Document/RAG Agent: Computing dense subword semantic embeddings & cosine similarity...");
 
-        List<RagService.RagChunk> chunks = ragService.retrieveRelevantChunks(query, 3);
-        steps.add(String.format("Semantic Vector RAG: Retrieved %d top matching handbook sections with similarity scores", chunks.size()));
+        List<RagService.RagChunk> chunks = ragService.retrieveWithSelfCorrection(query, 3, steps);
+        steps.add(String.format("Semantic Vector RAG: Retrieved %d top matching handbook section(s) with similarity scores", chunks.size()));
 
         if (chunks.isEmpty()) {
             steps.add("No matching document passages found in knowledge base.");

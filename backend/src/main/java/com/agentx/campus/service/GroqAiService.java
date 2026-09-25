@@ -40,12 +40,17 @@ public class GroqAiService {
     }
 
     public String generateResponse(String systemPrompt, String userMessage) {
+        if (apiKey == null || apiKey.trim().isEmpty() || "none".equalsIgnoreCase(apiKey.trim())) {
+            log.debug("Groq API key is not configured. Falling back to deterministic multi-agent response.");
+            return null;
+        }
+
         try {
             List<Map<String, String>> messages = new ArrayList<>();
             if (systemPrompt != null && !systemPrompt.isEmpty()) {
                 messages.add(Map.of("role", "system", "content", systemPrompt));
             }
-            messages.add(Map.of("role", "user", "content", userMessage));
+            messages.add(Map.of("role", "user", "content", userMessage != null ? userMessage : ""));
 
             Map<String, Object> requestBody = new HashMap<>();
             requestBody.put("model", this.model);
@@ -57,10 +62,10 @@ public class GroqAiService {
 
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(apiUrl))
-                    .header("Authorization", "Bearer " + apiKey)
+                    .header("Authorization", "Bearer " + apiKey.trim())
                     .header("Content-Type", "application/json")
                     .header("User-Agent", "AgentX-Campus/1.0")
-                    .timeout(Duration.ofSeconds(15))
+                    .timeout(Duration.ofSeconds(12))
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .build();
 
@@ -72,11 +77,15 @@ public class GroqAiService {
                 if (choices.isArray() && choices.size() > 0) {
                     return choices.get(0).path("message").path("content").asText().trim();
                 }
+            } else if (response.statusCode() == 429) {
+                log.warn("Groq API rate limit reached (HTTP 429). Falling back to deterministic agent reasoning.");
+            } else if (response.statusCode() == 401) {
+                log.warn("Groq API key unauthorized (HTTP 401). Falling back to deterministic agent reasoning.");
             } else {
                 log.warn("Groq API returned HTTP {}: {}", response.statusCode(), response.body());
             }
         } catch (Exception ex) {
-            log.error("Failed to query Groq AI API: {}", ex.getMessage());
+            log.warn("Groq AI service unavailable ({}). Falling back to deterministic agent reasoning.", ex.getMessage());
         }
         return null;
     }

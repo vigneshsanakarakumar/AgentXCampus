@@ -56,15 +56,15 @@ public class StudentController {
     }
 
     @PatchMapping("/tasks/{id}/status")
-    public ResponseEntity<?> updateTaskStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
+    public ResponseEntity<?> updateTaskStatus(Authentication authentication, @PathVariable Long id, @RequestBody Map<String, String> body) {
         String status = body.getOrDefault("status", "COMPLETED");
-        StudentTask task = studentService.updateTaskStatus(id, status);
+        StudentTask task = studentService.updateTaskStatus(id, status, authentication.getName());
         return ResponseEntity.ok(task);
     }
 
     @DeleteMapping("/tasks/{id}")
-    public ResponseEntity<?> deleteTask(@PathVariable Long id) {
-        studentService.deleteTask(id);
+    public ResponseEntity<?> deleteTask(Authentication authentication, @PathVariable Long id) {
+        studentService.deleteTask(id, authentication.getName());
         return ResponseEntity.ok(Map.of("message", "Task deleted successfully"));
     }
 

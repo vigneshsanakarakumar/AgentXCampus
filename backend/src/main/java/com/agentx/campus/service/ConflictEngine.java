@@ -283,20 +283,25 @@ public class ConflictEngine {
         return conflicts;
     }
 
-    /**
-     * Returns true if [start1,end1) overlaps [start2,end2).
-     * Accepts HH:mm AM/PM format (e.g. "09:00 AM"). Falls back to false on parse failure.
-     */
     private boolean timesOverlap(String start1, String end1, String start2, String end2) {
         try {
-            DateTimeFormatter fmt = DateTimeFormatter.ofPattern("hh:mm a");
-            LocalTime s1 = LocalTime.parse(start1.trim().toUpperCase(), fmt);
-            LocalTime e1 = LocalTime.parse(end1.trim().toUpperCase(), fmt);
-            LocalTime s2 = LocalTime.parse(start2.trim().toUpperCase(), fmt);
-            LocalTime e2 = LocalTime.parse(end2.trim().toUpperCase(), fmt);
+            LocalTime s1 = parseTime(start1);
+            LocalTime e1 = parseTime(end1);
+            LocalTime s2 = parseTime(start2);
+            LocalTime e2 = parseTime(end2);
             return s1.isBefore(e2) && s2.isBefore(e1);
         } catch (Exception ex) {
             return false; // don't block on format mismatch
         }
+    }
+
+    private LocalTime parseTime(String str) {
+        if (str == null) return LocalTime.MIDNIGHT;
+        String s = str.trim().toUpperCase(Locale.ENGLISH);
+        DateTimeFormatter fmt = new java.time.format.DateTimeFormatterBuilder()
+                .parseCaseInsensitive()
+                .appendPattern("[hh:mm a][h:mm a][HH:mm][H:mm]")
+                .toFormatter(Locale.ENGLISH);
+        return LocalTime.parse(s, fmt);
     }
 }

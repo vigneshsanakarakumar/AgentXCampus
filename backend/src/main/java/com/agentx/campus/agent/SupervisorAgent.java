@@ -25,6 +25,8 @@ public class SupervisorAgent {
     private final GrievanceAgent grievanceAgent;
     private final CampusResourceAgent campusResourceAgent;
     private final GeneralAiAgent generalAiAgent;
+    private final ExaminationAgent examinationAgent;
+    private final com.agentx.campus.service.AcademicEligibilityEngine academicEligibilityEngine;
 
     private final UserRepository userRepository;
     private final AgentTaskLogRepository taskLogRepository;
@@ -40,6 +42,8 @@ public class SupervisorAgent {
             GrievanceAgent grievanceAgent,
             CampusResourceAgent campusResourceAgent,
             GeneralAiAgent generalAiAgent,
+            ExaminationAgent examinationAgent,
+            com.agentx.campus.service.AcademicEligibilityEngine academicEligibilityEngine,
             UserRepository userRepository,
             AgentTaskLogRepository taskLogRepository,
             AiConversationRepository conversationRepository,
@@ -52,6 +56,8 @@ public class SupervisorAgent {
         this.grievanceAgent = grievanceAgent;
         this.campusResourceAgent = campusResourceAgent;
         this.generalAiAgent = generalAiAgent;
+        this.examinationAgent = examinationAgent;
+        this.academicEligibilityEngine = academicEligibilityEngine;
         this.userRepository = userRepository;
         this.taskLogRepository = taskLogRepository;
         this.conversationRepository = conversationRepository;
@@ -67,7 +73,16 @@ public class SupervisorAgent {
         int sourcesCount = 0;
 
         // Multi-Agent Intent Routing & Query Classifier
-        if (isAttendanceExplainQuery(lower)) {
+        if (isExamConflictQuery(lower)) {
+            intent = "Examination Conflict & Scheduling";
+            toolsUsed = "checkExamConflicts, getTimetableOccupancies, verifyRoomAvailability";
+            response = examinationAgent.process(username, query);
+        } else if (isEligibilityQuery(lower)) {
+            intent = "Academic Eligibility & Rule Engine";
+            toolsUsed = "getStudentProfile, getExamSchedule, getAttendanceRecord, getODRequests, searchRegulationsRAG, evaluateEligibilityRuleEngine";
+            response = academicEligibilityEngine.evaluateStudentExamEligibility(username, query);
+            sourcesCount = 1;
+        } else if (isAttendanceExplainQuery(lower)) {
             intent = "Attendance Session Explainer";
             toolsUsed = "explainAttendanceEntry, getAttendance, findLeaveRequest";
             response = academicAgent.process(username, query);
@@ -149,6 +164,19 @@ public class SupervisorAgent {
         }
 
         return response;
+    }
+
+    private boolean isExamConflictQuery(String q) {
+        return (q.contains("exam") || q.contains("examination") || q.contains("test")) &&
+                (q.contains("conflict") || q.contains("schedule") || q.contains("clash") ||
+                 q.contains("at 10") || q.contains("at 9") || q.contains("at 2") || q.contains("slot"));
+    }
+
+    private boolean isEligibilityQuery(String q) {
+        return (q.contains("eligible") || q.contains("eligibility") || q.contains("can i write") ||
+                q.contains("can i sit") || q.contains("admit card") || q.contains("hall ticket") ||
+                q.contains("condonation fee") || q.contains("condonation") || q.contains("68%") ||
+                (q.contains("exam") && (q.contains("tomorrow") || q.contains("write") || q.contains("sit"))));
     }
 
     private boolean isAttendanceExplainQuery(String q) {
